@@ -1,0 +1,11 @@
+{
+  "name": "shortreelx",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Kashyap",
+  "license": "ISC",
+  "description": "An AI-powered tool that transforms long videos into engaging YouTube Shorts, Instagram Reels, and other social media clips with maximum impact and virality."
+}
