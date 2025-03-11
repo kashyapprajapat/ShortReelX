@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const cors = require("cors");
 require("dotenv").config();
-const { analyzeFrames } = require("./aiAnalyzer");
+const { analyzeFrames } = require("./aiAnalyzer.js");
 
 const app = express();
 app.use(cors());
