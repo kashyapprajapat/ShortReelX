@@ -87,8 +87,6 @@
 
 
 
-
-
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
@@ -98,16 +96,14 @@ const ffmpeg = require('fluent-ffmpeg');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const speech = require('@google-cloud/speech'); // Import Google Cloud Speech
+const { HfInference } = require("@huggingface/inference");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// Google Cloud Speech client
-const client = new speech.SpeechClient();
+const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
 
 // Set up multer for file uploads
 const storage = multer.diskStorage({
@@ -139,34 +135,55 @@ async function extractAudio(videoPath, videoId) {
             .output(audioPath)
             .audioCodec('pcm_s16le')
             .format('wav')
-            .audioChannels(1) // Ensure single channel
-            .audioFrequency(16000) // Recommended sample rate for Speech-to-Text
+            .audioChannels(1)
+            .audioFrequency(16000)
             .on('end', () => resolve(audioPath))
             .on('error', reject)
             .run();
     });
 }
 
-// Transcribe audio using Google Cloud Speech-to-Text
+// Split audio into 30-second chunks
+async function splitAudio(audioPath, chunkDir) {
+    return new Promise((resolve, reject) => {
+        if (!fs.existsSync(chunkDir)) fs.mkdirSync(chunkDir, { recursive: true });
+
+        ffmpeg(audioPath)
+            .output(`${chunkDir}/chunk_%03d.wav`)
+            .format('wav')
+            .audioCodec('pcm_s16le')
+            .audioChannels(1)
+            .audioFrequency(16000)
+            .duration(30) // Ensure each chunk is max 30 seconds
+            .on('end', () => {
+                const chunks = fs.readdirSync(chunkDir).map(file => path.join(chunkDir, file));
+                resolve(chunks);
+            })
+            .on('error', reject)
+            .run();
+    });
+}
+
+// Transcribe audio using Hugging Face Whisper Model (Handles Large Files)
 async function transcribeAudio(audioPath) {
-    const file = fs.readFileSync(audioPath);
-    const audioBytes = file.toString('base64');
+    const videoId = path.basename(audioPath, '.wav');
+    const chunkDir = `./uploads/${videoId}/chunks`;
 
-    const request = {
-        audio: { content: audioBytes },
-        config: {
-            encoding: 'LINEAR16',
-            sampleRateHertz: 16000,
-            languageCode: 'en-US', // Change language if needed
-        },
-    };
+    const chunks = await splitAudio(audioPath, chunkDir);
+    let fullTranscript = "";
 
-    const [response] = await client.recognize(request);
-    const transcript = response.results
-        .map(result => result.alternatives[0].transcript)
-        .join(' ');
+    for (const chunk of chunks) {
+        const audioBuffer = fs.readFileSync(chunk);
+        const response = await hf.automaticSpeechRecognition({
+            model: "openai/whisper-large", // Using Large Model
+            data: audioBuffer,
+            parameters: { return_timestamps: true } // Avoids error
+        });
 
-    return transcript;
+        fullTranscript += response.text + " ";
+    }
+
+    return fullTranscript.trim();
 }
 
 // Analyze transcript with Gemini AI

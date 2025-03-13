@@ -1,1 +1,2 @@
 GEMINI_API_KEY=<YOUR_KEY>
+HUGGINGFACE_API_KEY=<Your whisper hugging face api ky>
