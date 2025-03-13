@@ -89,7 +89,6 @@
 
 
 
-
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
@@ -98,9 +97,8 @@ const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-const nodewhisper = require('nodejs-whisper'); // Fix: Ensure correct import for CommonJS
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-
+const speech = require('@google-cloud/speech'); // Import Google Cloud Speech
 
 const app = express();
 app.use(cors());
@@ -108,7 +106,8 @@ app.use(express.json());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-
+// Google Cloud Speech client
+const client = new speech.SpeechClient();
 
 // Set up multer for file uploads
 const storage = multer.diskStorage({
@@ -140,34 +139,35 @@ async function extractAudio(videoPath, videoId) {
             .output(audioPath)
             .audioCodec('pcm_s16le')
             .format('wav')
+            .audioChannels(1) // Ensure single channel
+            .audioFrequency(16000) // Recommended sample rate for Speech-to-Text
             .on('end', () => resolve(audioPath))
             .on('error', reject)
             .run();
     });
 }
 
-// Transcribe audio using Whisper
+// Transcribe audio using Google Cloud Speech-to-Text
 async function transcribeAudio(audioPath) {
-    const filePath = path.resolve(audioPath);
+    const file = fs.readFileSync(audioPath);
+    const audioBytes = file.toString('base64');
 
-    const transcript = await nodewhisper.nodewhisper(filePath, {
-        modelName: 'base.en', // Ensure you have this model downloaded
-        autoDownloadModelName: 'base.en',
-        removeWavFileAfterTranscription: false,
-        withCuda: false,
-        logger: console,
-        whisperOptions: {
-            outputInText: true, // Get the output as text
-            outputInSrt: false, 
-            outputInJson: false,
-            translateToEnglish: false,
-            wordTimestamps: false,
+    const request = {
+        audio: { content: audioBytes },
+        config: {
+            encoding: 'LINEAR16',
+            sampleRateHertz: 16000,
+            languageCode: 'en-US', // Change language if needed
         },
-    });
+    };
+
+    const [response] = await client.recognize(request);
+    const transcript = response.results
+        .map(result => result.alternatives[0].transcript)
+        .join(' ');
 
     return transcript;
 }
-
 
 // Analyze transcript with Gemini AI
 async function analyzeTranscript(text, numShorts) {
