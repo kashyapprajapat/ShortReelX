@@ -90,51 +90,51 @@
 
 
 
-
-
-
-
 require('dotenv').config();
 const express = require('express');
-const bodyParser = require('body-parser');
+const multer = require('multer');
 const cors = require('cors');
 const fs = require('fs');
-const ytdl = require('ytdl-core');
-const { v4: uuidv4 } = require('uuid');
 const ffmpeg = require('fluent-ffmpeg');
-const { Whisper } = require('whisper-nodejs');
+const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+const nodewhisper = require('nodejs-whisper'); // Fix: Ensure correct import for CommonJS
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+
 
 const app = express();
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+
+
+// Set up multer for file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadPath = './uploads';
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: function (req, file, cb) {
+        cb(null, `${uuidv4()}-${file.originalname}`);
+    }
+});
+
+const upload = multer({ storage: storage });
 
 app.get('/', (req, res) => {
     res.json({ message: "ShortReelX v2 is running properly" });
 });
 
-// Function to download YouTube video
-async function downloadVideo(url) {
-    if (!ytdl.validateURL(url)) throw new Error('Invalid YouTube URL');
-
-    const videoId = uuidv4();
-    const dirPath = `./videos/${videoId}`;
-    if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
-
-    const videoPath = `${dirPath}/original.mp4`;
-    return new Promise((resolve, reject) => {
-        ytdl(url, { quality: 'highest' })
-            .pipe(fs.createWriteStream(videoPath))
-            .on('finish', () => resolve({ videoId, videoPath }))
-            .on('error', reject);
-    });
-}
-
-// Extract audio from video
+// Extract audio from uploaded video
 async function extractAudio(videoPath, videoId) {
-    const audioPath = `./videos/${videoId}/audio.wav`;
+    const audioPath = `./uploads/${videoId}/audio.wav`;
+    if (!fs.existsSync(`./uploads/${videoId}`)) fs.mkdirSync(`./uploads/${videoId}`, { recursive: true });
+
     return new Promise((resolve, reject) => {
         ffmpeg(videoPath)
             .output(audioPath)
@@ -148,10 +148,26 @@ async function extractAudio(videoPath, videoId) {
 
 // Transcribe audio using Whisper
 async function transcribeAudio(audioPath) {
-    const whisper = new Whisper({ model: 'base.en' });
-    const transcript = await whisper.transcribe(audioPath);
+    const filePath = path.resolve(audioPath);
+
+    const transcript = await nodewhisper.nodewhisper(filePath, {
+        modelName: 'base.en', // Ensure you have this model downloaded
+        autoDownloadModelName: 'base.en',
+        removeWavFileAfterTranscription: false,
+        withCuda: false,
+        logger: console,
+        whisperOptions: {
+            outputInText: true, // Get the output as text
+            outputInSrt: false, 
+            outputInJson: false,
+            translateToEnglish: false,
+            wordTimestamps: false,
+        },
+    });
+
     return transcript;
 }
+
 
 // Analyze transcript with Gemini AI
 async function analyzeTranscript(text, numShorts) {
@@ -176,7 +192,7 @@ async function analyzeTranscript(text, numShorts) {
 
 // Generate Shorts from extracted clips
 async function generateShort(videoPath, videoId, clip) {
-    const shortPath = `./videos/${videoId}/short-${Date.now()}.mp4`;
+    const shortPath = `./uploads/${videoId}/short-${Date.now()}.mp4`;
 
     await new Promise((resolve, reject) => {
         ffmpeg(videoPath)
@@ -195,24 +211,45 @@ async function generateShort(videoPath, videoId, clip) {
     return shortPath;
 }
 
-// API to generate Shorts
-app.post('/generate-shorts', async (req, res) => {
+// API to upload and process video
+app.post('/upload', upload.single('video'), async (req, res) => {
     try {
-        const { url, numShorts } = req.body;
+        if (!req.file) throw new Error('No file uploaded');
+        
+        const videoPath = req.file.path;
+        const videoId = req.file.filename.split('-')[0];
 
-        // 1. Download video
-        const { videoId, videoPath } = await downloadVideo(url);
-
-        // 2. Extract audio
+        // Extract audio
         const audioPath = await extractAudio(videoPath, videoId);
 
-        // 3. Transcribe audio
+        // Transcribe audio
         const transcript = await transcribeAudio(audioPath);
 
-        // 4. Analyze transcript
+        res.json({ videoId, transcript });
+    } catch (error) {
+        console.error("Error in /upload:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API to generate Shorts from uploaded video
+app.post('/generate-shorts', async (req, res) => {
+    try {
+        const { videoId, numShorts } = req.body;
+        const videoPath = `./uploads/${videoId}.mp4`;
+
+        if (!fs.existsSync(videoPath)) throw new Error('Video not found');
+
+        // Extract audio
+        const audioPath = await extractAudio(videoPath, videoId);
+
+        // Transcribe audio
+        const transcript = await transcribeAudio(audioPath);
+
+        // Analyze transcript
         const { clips } = await analyzeTranscript(transcript, numShorts);
 
-        // 5. Generate Shorts
+        // Generate Shorts
         const shortPaths = [];
         for (const clip of clips) {
             const path = await generateShort(videoPath, videoId, clip);
@@ -222,18 +259,6 @@ app.post('/generate-shorts', async (req, res) => {
         res.json({ videoId, shorts: shortPaths });
     } catch (error) {
         console.error("Error in /generate-shorts:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// API to download video
-app.post('/download', async (req, res) => {
-    try {
-        const { url } = req.body;
-        const { videoId } = await downloadVideo(url);
-        res.json({ videoId });
-    } catch (error) {
-        console.error("Error in /download:", error);
         res.status(500).json({ error: error.message });
     }
 });
