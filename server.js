@@ -253,20 +253,28 @@ app.post('/upload', upload.single('video'), async (req, res) => {
 app.post('/generate-shorts', async (req, res) => {
     try {
         const { videoId, numShorts } = req.body;
-        const videoPath = `./uploads/${videoId}.mp4`;
+        const uploadDir = './uploads';
 
-        if (!fs.existsSync(videoPath)) throw new Error('Video not found');
+        // Find the video file by videoId
+        const files = fs.readdirSync(uploadDir);
+        const videoFile = files.find(file => 
+            file.startsWith(`${videoId}-`) && 
+            file.endsWith('.mp4')
+        );
 
-        // Extract audio
+        if (!videoFile) throw new Error('Video not found');
+        const videoPath = path.join(uploadDir, videoFile);
+
+        // Extract audio (existing code)
         const audioPath = await extractAudio(videoPath, videoId);
 
-        // Transcribe audio
+        // Transcribe audio (existing code)
         const transcript = await transcribeAudio(audioPath);
 
-        // Analyze transcript
+        // Analyze transcript (existing code)
         const { clips } = await analyzeTranscript(transcript, numShorts);
 
-        // Generate Shorts
+        // Generate Shorts (existing code)
         const shortPaths = [];
         for (const clip of clips) {
             const path = await generateShort(videoPath, videoId, clip);
