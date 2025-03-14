@@ -120,10 +120,123 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-
 app.get('/', (req, res) => {
-    res.json({ message: "ShortReelX v2 is running properly" });
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ShortReelX v2</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                line-height: 1.6;
+                margin: 0;
+                padding: 20px;
+                background-color: #f0f2f5;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-height: 100vh;
+            }
+
+            .container {
+                max-width: 800px;
+                background: white;
+                padding: 2rem;
+                border-radius: 12px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                margin: 20px;
+            }
+
+            h1 {
+                color: #1a73e8;
+                text-align: center;
+                margin-bottom: 1.5rem;
+            }
+
+            .description {
+                font-size: 1.1rem;
+                color: #444;
+                margin-bottom: 2rem;
+                text-align: center;
+            }
+
+            .routes-section {
+                margin-top: 2rem;
+            }
+
+            .route {
+                background: #f8f9fa;
+                padding: 1.5rem;
+                border-radius: 8px;
+                margin-bottom: 1.5rem;
+            }
+
+            .route h2 {
+                color: #1a73e8;
+                margin-top: 0;
+                font-size: 1.2rem;
+            }
+
+            .route ul {
+                list-style-type: none;
+                padding-left: 0;
+            }
+
+            .route li {
+                margin-bottom: 0.5rem;
+                color: #666;
+            }
+
+            .method {
+                display: inline-block;
+                background: #1a73e8;
+                color: white;
+                padding: 0.2rem 0.5rem;
+                border-radius: 4px;
+                font-size: 0.9rem;
+                margin-right: 0.5rem;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🎥 ShortReelX v2</h1>
+            
+            <div class="description">
+                <p>An AI-powered tool that transforms long videos into engaging YouTube Shorts, Instagram Reels, 
+                and other social media clips with maximum impact and virality.</p>
+            </div>
+
+            <div class="routes-section">
+                <div class="route">
+                    <h2><span class="method">POST</span> /upload</h2>
+                    <ul>
+                        <li><strong>Purpose:</strong> Upload and process video</li>
+                        <li><strong>Request Body:</strong> Multipart form with 'video' file</li>
+                        <li><strong>Response:</strong> { videoId: string, transcript: string }</li>
+                    </ul>
+                </div>
+
+                <div class="route">
+                    <h2><span class="method">POST</span> /generate-shorts</h2>
+                    <ul>
+                        <li><strong>Purpose:</strong> Generate short clips from uploaded video</li>
+                        <li><strong>Request Body:</strong> { videoId: string, numShorts: number }</li>
+                        <li><strong>Response:</strong> { videoId: string, shorts: string[] }</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    res.send(htmlContent);
 });
+
 
 // Extract audio from uploaded video
 async function extractAudio(videoPath, videoId) {
