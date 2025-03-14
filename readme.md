@@ -60,6 +60,11 @@ The server will start at `http://localhost:7777/`.
 }
 ```
 
+// Upload endpoint response
+![Alt Text](uploadendpoint.png)
+
+
+
 ### 2. Generate Shorts
 **Endpoint:** `POST /generate-shorts`
 
@@ -78,6 +83,32 @@ The server will start at `http://localhost:7777/`.
   "shorts": ["path-to-short1.mp4", "path-to-short2.mp4"]
 }
 ```
+
+
+// Generate shorts response
+![Alt Text](Generateshorts.png)
+
+
+
+### 3. Generate Exciting Thumbnails
+**Endpoint:** `POST /getexcitingthumbnails`
+**Request:
+FormData with:**
+```json
+video (file): Video to extract thumbnails from
+numThumbnails (number): Number of thumbnails to generate (1-3)
+```
+
+
+**Process:**
+```
+AI analyzes video content to find visually compelling moments
+Applies enhancement filters (brightness, contrast, sharpening)
+```
+// Generated thumnaials pick
+![Alt Text](thumbnail-2.jpg)
+
+
 
 ---
 
@@ -146,8 +177,5 @@ is a fusion of three powerful words:
 ##### my approch is thaat first download the video and generate the caption of it and now give that caption to gemai or any llm model based on that it will give use high chanses of that more views on ytshorts according  youtube shorts rules like (verticall,must be a 9:16 aspect ratio etc)  to that it will retunt the time stemp and based on that time step we will crop that part using ffmpeg and give it tot he user 
 
 
-// Upload endpoint response
-![Alt Text](uploadendpoint.png)
 
-// Generate shorts response
-![Alt Text](Generateshorts.png)
+
