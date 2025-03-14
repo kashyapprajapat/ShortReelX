@@ -79,8 +79,8 @@
 
 // =========================================================================
 //
-//    Approach V2 
 //
+//                            Approach V2 
 //
 //
 // ==========================================================================
@@ -154,7 +154,7 @@ async function splitAudio(audioPath, chunkDir) {
             .audioCodec('pcm_s16le')
             .audioChannels(1)
             .audioFrequency(16000)
-            .duration(30) // Ensure each chunk is max 30 seconds
+            .duration(30)
             .on('end', () => {
                 const chunks = fs.readdirSync(chunkDir).map(file => path.join(chunkDir, file));
                 resolve(chunks);
@@ -164,7 +164,7 @@ async function splitAudio(audioPath, chunkDir) {
     });
 }
 
-// Transcribe audio using Hugging Face Whisper Model (Handles Large Files)
+// Transcribe audio using Hugging Face Whisper Model
 async function transcribeAudio(audioPath) {
     const videoId = path.basename(audioPath, '.wav');
     const chunkDir = `./uploads/${videoId}/chunks`;
@@ -175,9 +175,9 @@ async function transcribeAudio(audioPath) {
     for (const chunk of chunks) {
         const audioBuffer = fs.readFileSync(chunk);
         const response = await hf.automaticSpeechRecognition({
-            model: "openai/whisper-large", // Using Large Model
+            model: "openai/whisper-large",
             data: audioBuffer,
-            parameters: { return_timestamps: true } // Avoids error
+            parameters: { return_timestamps: true }
         });
 
         fullTranscript += response.text + " ";
@@ -186,9 +186,9 @@ async function transcribeAudio(audioPath) {
     return fullTranscript.trim();
 }
 
-// Analyze transcript with Gemini AI
+// Analyze transcript with Gemini AI (Fixed JSON parsing)
 async function analyzeTranscript(text, numShorts) {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `
     Analyze this video transcript and suggest ${numShorts} timestamps (in seconds) 
@@ -198,13 +198,27 @@ async function analyzeTranscript(text, numShorts) {
     3. Prefer segments with clear visual action
     4. Avoid slow-paced sections
     
-    Return JSON format: { "clips": [{ "start": number, "end": number }] }
+    Return ONLY VALID JSON without any markdown formatting:
+    { "clips": [{ "start": number, "end": number }] }
     
     Transcript: ${text}
     `;
 
-    const result = await model.generateContent(prompt);
-    return JSON.parse(result.response.text());
+    try {
+        const result = await model.generateContent(prompt);
+        const responseText = await result.response.text();
+        
+        // Clean the response
+        const cleanedResponse = responseText
+            .replace(/```json/g, '')
+            .replace(/```/g, '')
+            .trim();
+
+        return JSON.parse(cleanedResponse);
+    } catch (error) {
+        console.error('Error parsing Gemini response:', error);
+        throw new Error('Failed to parse AI response');
+    }
 }
 
 // Generate Shorts from extracted clips
@@ -228,7 +242,7 @@ async function generateShort(videoPath, videoId, clip) {
     return shortPath;
 }
 
-// API to upload and process video
+// API endpoints
 app.post('/upload', upload.single('video'), async (req, res) => {
     try {
         if (!req.file) throw new Error('No file uploaded');
@@ -236,10 +250,7 @@ app.post('/upload', upload.single('video'), async (req, res) => {
         const videoPath = req.file.path;
         const videoId = req.file.filename.split('-')[0];
 
-        // Extract audio
         const audioPath = await extractAudio(videoPath, videoId);
-
-        // Transcribe audio
         const transcript = await transcribeAudio(audioPath);
 
         res.json({ videoId, transcript });
@@ -249,13 +260,11 @@ app.post('/upload', upload.single('video'), async (req, res) => {
     }
 });
 
-// API to generate Shorts from uploaded video
 app.post('/generate-shorts', async (req, res) => {
     try {
         const { videoId, numShorts } = req.body;
         const uploadDir = './uploads';
 
-        // Find the video file by videoId
         const files = fs.readdirSync(uploadDir);
         const videoFile = files.find(file => 
             file.startsWith(`${videoId}-`) && 
@@ -265,16 +274,11 @@ app.post('/generate-shorts', async (req, res) => {
         if (!videoFile) throw new Error('Video not found');
         const videoPath = path.join(uploadDir, videoFile);
 
-        // Extract audio (existing code)
+        
         const audioPath = await extractAudio(videoPath, videoId);
-
-        // Transcribe audio (existing code)
         const transcript = await transcribeAudio(audioPath);
-
-        // Analyze transcript (existing code)
         const { clips } = await analyzeTranscript(transcript, numShorts);
 
-        // Generate Shorts (existing code)
         const shortPaths = [];
         for (const clip of clips) {
             const path = await generateShort(videoPath, videoId, clip);
