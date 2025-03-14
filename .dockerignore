@@ -1,0 +1,12 @@
+
+node_modules
+npm-debug.log
+package-lock.json
+
+# Ignore logs
+logs
+*.log
+
+# Ignore environment variables
+.env
+
