@@ -1,3 +1,127 @@
+# ShortReelX
+
+ShortReelX is an AI-powered tool that transforms long videos into engaging YouTube Shorts, Instagram Reels, and other social media clips with maximum impact and virality.
+
+## Features
+- Upload long-form videos
+- Extract transcripts using AI
+- Generate short clips from key moments
+- Ideal for content repurposing
+
+---
+
+## Installation & Setup
+
+### Prerequisites
+Ensure you have the following installed:
+- [Node.js](https://nodejs.org/) (v16+ recommended)
+- [FFmpeg](https://ffmpeg.org/download.html) (for video processing)
+- [Git](https://git-scm.com/)
+
+### Clone the Repository
+```sh
+git clone https://github.com/kashyapprajapat/ShortReelX.git
+cd ShortReelX
+```
+
+### Install Dependencies
+```sh
+npm install
+```
+
+### Configure Environment Variables
+Create a `.env` file in the project root and configure it as needed:
+```env
+PORT=7777
+# Add other necessary configurations
+```
+
+### Start the Server
+```sh
+npm start
+```
+The server will start at `http://localhost:7777/`.
+
+---
+
+## API Endpoints
+
+### 1. Upload a Video
+**Endpoint:** `POST /upload`
+
+**Request:**
+- FormData (video file)
+
+**Response:**
+```json
+{
+  "videoId": "unique-id",
+  "transcript": "Extracted text from video"
+}
+```
+
+### 2. Generate Shorts
+**Endpoint:** `POST /generate-shorts`
+
+**Request Body:**
+```json
+{
+  "videoId": "unique-id",
+  "numShorts": 3
+}
+```
+
+**Response:**
+```json
+{
+  "videoId": "unique-id",
+  "shorts": ["path-to-short1.mp4", "path-to-short2.mp4"]
+}
+```
+
+---
+
+## Forking the Project
+If you want to contribute or customize the project, follow these steps:
+
+1. **Fork the Repository**
+   - Click the **Fork** button on the [GitHub repo](https://github.com/kashyapprajapat/ShortReelX).
+
+2. **Clone Your Fork**
+   ```sh
+   git clone https://github.com/kashyapprajapat/ShortReelX.git
+   cd ShortReelX
+   ```
+
+3. **Create a New Branch**
+   ```sh
+   git checkout -b feature-branch
+   ```
+
+4. **Make Your Changes & Commit**
+   ```sh
+   git add .
+   git commit -m "Your changes"
+   ```
+
+5. **Push Changes to Your Fork**
+   ```sh
+   git push origin feature-branch
+   ```
+
+6. **Submit a Pull Request**
+   - Go to your forked repo on GitHub
+   - Click on **Pull Request** > **New Pull Request**
+   - Select your branch and submit the PR for review
+
+---
+
+## Contributing
+Contributions are welcome! Feel free to fork, improve, and submit a PR.
+
+---
+
+
 # ShortReelX 
 is a fusion of three powerful words:
 
