@@ -86,7 +86,6 @@
 // ==========================================================================
 
 
-
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
@@ -120,6 +119,8 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
+
+// Home 🏠 Route 
 app.get('/', (req, res) => {
     const htmlContent = `
     <!DOCTYPE html>
@@ -226,6 +227,24 @@ app.get('/', (req, res) => {
                         <li><strong>Purpose:</strong> Generate short clips from uploaded video</li>
                         <li><strong>Request Body:</strong> { videoId: string, numShorts: number }</li>
                         <li><strong>Response:</strong> { videoId: string, shorts: string[] }</li>
+                    </ul>
+                </div>
+                
+                <div class="route">
+                    <h2><span class="method">POST</span> /getexcitingthumbnails</h2>
+                    <ul>
+                        <li><strong>Purpose:</strong> Generate engaging thumbnails from video</li>
+                        <li><strong>Request Body:</strong> Multipart form with 'video' file and 'numThumbnails' field (1-3)</li>
+                        <li><strong>Process:</strong> AI analyzes video content to find visually compelling moments</li>
+                        <li><strong>Enhanced Features:</strong> Applies brightness, contrast, and sharpening for eye-catching results</li>
+                        <li><strong>Response:</strong> { 
+                            videoId: string, 
+                            thumbnails: [{ 
+                                path: string, 
+                                timestamp: number, 
+                                description: string 
+                            }] 
+                        }</li>
                     </ul>
                 </div>
             </div>
@@ -355,6 +374,103 @@ async function generateShort(videoPath, videoId, clip) {
     return shortPath;
 }
 
+// Find exciting thumbnail timestamps from video
+async function findExcitingThumbnailTimestamps(videoPath, transcript, numThumbnails) {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    
+    // Get video duration
+    const videoDuration = await getVideoDuration(videoPath);
+    
+    const prompt = `
+    Analyze this video transcript and suggest ${numThumbnails} timestamps (in seconds) 
+    for eye-catching thumbnails that would attract viewers. Follow these rules:
+    1. Choose moments with high visual appeal or action
+    2. Select diverse moments across the video's duration
+    3. Prefer moments with interesting subjects/faces if applicable
+    4. Avoid text-heavy or visually boring scenes
+    5. Timestamps must be between 0 and ${Math.floor(videoDuration)} seconds
+    
+    Return ONLY VALID JSON without any markdown formatting:
+    { "thumbnails": [{ "timestamp": number, "description": "brief description of why this moment is visually interesting" }] }
+    
+    Transcript: ${transcript}
+    `;
+
+    try {
+        const result = await model.generateContent(prompt);
+        const responseText = await result.response.text();
+        
+        // Clean the response
+        const cleanedResponse = responseText
+            .replace(/```json/g, '')
+            .replace(/```/g, '')
+            .trim();
+
+        return JSON.parse(cleanedResponse);
+    } catch (error) {
+        console.error('Error parsing Gemini response for thumbnails:', error);
+        // Fallback to evenly spaced thumbnails if AI fails
+        const thumbnails = [];
+        for (let i = 0; i < numThumbnails; i++) {
+            const timestamp = Math.floor((videoDuration / (numThumbnails + 1)) * (i + 1));
+            thumbnails.push({
+                timestamp,
+                description: `Auto-generated thumbnail ${i+1}`
+            });
+        }
+        return { thumbnails };
+    }
+}
+
+// Get video duration using ffmpeg
+function getVideoDuration(videoPath) {
+    return new Promise((resolve, reject) => {
+        ffmpeg.ffprobe(videoPath, (err, metadata) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve(metadata.format.duration);
+        });
+    });
+}
+
+// Extract thumbnail from video at specific timestamp
+async function extractThumbnail(videoPath, timestamp, outputPath) {
+    return new Promise((resolve, reject) => {
+        ffmpeg(videoPath)
+            .screenshots({
+                timestamps: [timestamp],
+                filename: path.basename(outputPath),
+                folder: path.dirname(outputPath),
+                size: '1280x720'
+            })
+            .on('end', () => resolve(outputPath))
+            .on('error', reject);
+    });
+}
+
+// Enhance thumbnail with filters
+async function enhanceThumbnail(inputPath, outputPath) {
+    return new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+            .videoFilters([
+                // Improve brightness, contrast and saturation for eye-catching thumbnails
+                { filter: 'eq', options: { brightness: '0.05', contrast: '1.2', saturation: '1.3' } },
+                // Light sharpening
+                { filter: 'unsharp', options: { luma_msize_x: 5, luma_msize_y: 5, luma_amount: 1.0 } }
+            ])
+            .output(outputPath)
+            .on('end', () => {
+                // Remove the original unenhanced thumbnail
+                fs.unlinkSync(inputPath);
+                resolve(outputPath);
+            })
+            .on('error', reject)
+            .run();
+    });
+}
+
 // API endpoints
 app.post('/upload', upload.single('video'), async (req, res) => {
     try {
@@ -401,6 +517,68 @@ app.post('/generate-shorts', async (req, res) => {
         res.json({ videoId, shorts: shortPaths });
     } catch (error) {
         console.error("Error in /generate-shorts:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// New route for generating exciting thumbnails
+app.post('/getexcitingthumbnails', upload.single('video'), async (req, res) => {
+    try {
+        if (!req.file) throw new Error('No video file uploaded');
+        
+        // Get number of thumbnails (default to 1, max 3)
+        const numThumbnails = Math.min(
+            Math.max(parseInt(req.body.numThumbnails) || 1, 1), 
+            3
+        );
+        
+        const videoPath = req.file.path;
+        const videoId = req.file.filename.split('-')[0];
+        
+        // Create directory for thumbnails if it doesn't exist
+        const thumbnailDir = `./uploads/${videoId}/thumbnails`;
+        if (!fs.existsSync(thumbnailDir)) {
+            fs.mkdirSync(thumbnailDir, { recursive: true });
+        }
+        
+        // Extract audio and generate transcript to help AI pick good moments
+        const audioPath = await extractAudio(videoPath, videoId);
+        const transcript = await transcribeAudio(audioPath);
+        
+        // Find exciting timestamps for thumbnails
+        const { thumbnails } = await findExcitingThumbnailTimestamps(
+            videoPath, 
+            transcript, 
+            numThumbnails
+        );
+        
+        // Extract and enhance thumbnails
+        const thumbnailPaths = [];
+        for (let i = 0; i < thumbnails.length; i++) {
+            const timestamp = thumbnails[i].timestamp;
+            const description = thumbnails[i].description;
+            
+            // Extract raw thumbnail
+            const rawPath = path.join(thumbnailDir, `raw-thumb-${i+1}.jpg`);
+            await extractThumbnail(videoPath, timestamp, rawPath);
+            
+            // Enhance the thumbnail
+            const enhancedPath = path.join(thumbnailDir, `thumbnail-${i+1}.jpg`);
+            await enhanceThumbnail(rawPath, enhancedPath);
+            
+            thumbnailPaths.push({
+                path: enhancedPath,
+                timestamp: timestamp,
+                description: description
+            });
+        }
+        
+        res.json({ 
+            videoId, 
+            thumbnails: thumbnailPaths
+        });
+    } catch (error) {
+        console.error("Error in /getexcitingthumbnails:", error);
         res.status(500).json({ error: error.message });
     }
 });
