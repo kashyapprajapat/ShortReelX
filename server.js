@@ -605,6 +605,8 @@
 //
 //
 // ===============================================================================
+
+
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
@@ -703,10 +705,8 @@ async function extractAudio(videoPath, videoId, tempDir) {
       .format('wav')
       .audioChannels(1)
       .audioFrequency(16000)
-      // Add resource constraints
       .outputOptions([
         '-threads 2',
-        '-memory_limit 512M',
         '-preset ultrafast'
       ])
       .on('end', () => resolve())
@@ -730,10 +730,8 @@ async function splitAudio(audioPath, videoId, tempDir) {
       .audioChannels(1)
       .audioFrequency(16000)
       .duration(30)
-      // Add resource constraints
       .outputOptions([
         '-threads 2',
-        '-memory_limit 512M',
         '-preset ultrafast'
       ])
       .on('end', resolve)
@@ -747,6 +745,8 @@ async function splitAudio(audioPath, videoId, tempDir) {
   for (const chunkFile of chunkFiles) {
     const result = await uploadFileToCloudinary(chunkFile, `${videoId}/chunks`, path.basename(chunkFile));
     chunkUrls.push(result.secure_url);
+    // Add delay between uploads
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
   return { localPaths: chunkFiles, cloudinaryUrls: chunkUrls };
@@ -764,7 +764,7 @@ async function transcribeAudio(audioPath, videoId, tempDir) {
       parameters: { return_timestamps: true }
     });
     fullTranscript += response.text + " ";
-    // Add delay between chunks to prevent memory overload
+    // Add delay between chunks
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
@@ -815,10 +815,8 @@ async function generateShort(videoPath, videoId, clip, tempDir) {
         { filter: 'scale', options: { w: 1080, h: 1920, force_original_aspect_ratio: 'decrease' } },
         { filter: 'pad', options: { w: 1080, h: 1920, x: '(ow-iw)/2', y: '(oh-ih)/2' } }
       ])
-      // Add resource constraints and optimization flags
       .outputOptions([
         '-threads 2',
-        '-memory_limit 512M',
         '-preset ultrafast',
         '-crf 28',
         '-maxrate 2M',
@@ -892,7 +890,7 @@ async function extractThumbnail(videoPath, timestamp, tempDir, index) {
       })
       .outputOptions([
         '-threads 2',
-        '-memory_limit 512M'
+        '-preset ultrafast'
       ])
       .on('end', resolve)
       .on('error', reject);
@@ -913,7 +911,6 @@ async function enhanceThumbnail(inputPath, videoId, index, tempDir) {
       ])
       .outputOptions([
         '-threads 2',
-        '-memory_limit 512M',
         '-preset ultrafast'
       ])
       .output(enhancedPath)
@@ -1020,7 +1017,6 @@ app.post('/generate-shorts', async (req, res) => {
         await new Promise(resolve => setTimeout(resolve, 2000)); // 2 seconds delay
       } catch (error) {
         console.error('Error generating short:', error);
-        // Continue with next clip if one fails
         continue;
       }
     }
