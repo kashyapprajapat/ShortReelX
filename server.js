@@ -605,7 +605,6 @@
 //
 //
 // ===============================================================================
-
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
@@ -704,6 +703,12 @@ async function extractAudio(videoPath, videoId, tempDir) {
       .format('wav')
       .audioChannels(1)
       .audioFrequency(16000)
+      // Add resource constraints
+      .outputOptions([
+        '-threads 2',
+        '-memory_limit 512M',
+        '-preset ultrafast'
+      ])
       .on('end', () => resolve())
       .on('error', reject)
       .run();
@@ -725,6 +730,12 @@ async function splitAudio(audioPath, videoId, tempDir) {
       .audioChannels(1)
       .audioFrequency(16000)
       .duration(30)
+      // Add resource constraints
+      .outputOptions([
+        '-threads 2',
+        '-memory_limit 512M',
+        '-preset ultrafast'
+      ])
       .on('end', resolve)
       .on('error', reject)
       .run();
@@ -753,6 +764,8 @@ async function transcribeAudio(audioPath, videoId, tempDir) {
       parameters: { return_timestamps: true }
     });
     fullTranscript += response.text + " ";
+    // Add delay between chunks to prevent memory overload
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
   const transcriptPath = path.join(tempDir, 'transcript.txt');
@@ -801,6 +814,15 @@ async function generateShort(videoPath, videoId, clip, tempDir) {
       .videoFilters([
         { filter: 'scale', options: { w: 1080, h: 1920, force_original_aspect_ratio: 'decrease' } },
         { filter: 'pad', options: { w: 1080, h: 1920, x: '(ow-iw)/2', y: '(oh-ih)/2' } }
+      ])
+      // Add resource constraints and optimization flags
+      .outputOptions([
+        '-threads 2',
+        '-memory_limit 512M',
+        '-preset ultrafast',
+        '-crf 28',
+        '-maxrate 2M',
+        '-bufsize 2M'
       ])
       .output(shortPath)
       .on('end', resolve)
@@ -868,6 +890,10 @@ async function extractThumbnail(videoPath, timestamp, tempDir, index) {
         folder: tempDir,
         size: '1280x720'
       })
+      .outputOptions([
+        '-threads 2',
+        '-memory_limit 512M'
+      ])
       .on('end', resolve)
       .on('error', reject);
   });
@@ -884,6 +910,11 @@ async function enhanceThumbnail(inputPath, videoId, index, tempDir) {
       .videoFilters([
         { filter: 'eq', options: { brightness: '0.05', contrast: '1.2', saturation: '1.3' } },
         { filter: 'unsharp', options: { luma_msize_x: 5, luma_msize_y: 5, luma_amount: 1.0 } }
+      ])
+      .outputOptions([
+        '-threads 2',
+        '-memory_limit 512M',
+        '-preset ultrafast'
       ])
       .output(enhancedPath)
       .on('end', resolve)
@@ -955,7 +986,10 @@ app.post('/upload', upload.single('video'), async (req, res) => {
     res.json({ videoId, transcript, videoUrl: videoResult.secure_url });
   } catch (error) {
     await cleanupTempFiles(tempDir);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message,
+      suggestion: 'Please ensure the video file is valid and try again'
+    });
   }
 });
 
@@ -968,22 +1002,43 @@ app.post('/generate-shorts', async (req, res) => {
     const tempVideoPath = path.join(tempDir, 'video.mp4');
     await downloadFromCloudinary(videoUrl, tempVideoPath);
     
+    // Add delay between processing to prevent memory overload
     const audioPath = await extractAudio(tempVideoPath, videoId, tempDir);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+    
     const transcript = await transcribeAudio(audioPath, videoId, tempDir);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
     
     const { clips } = await analyzeTranscript(transcript, numShorts);
     const shortUrls = [];
     
     for (const clip of clips) {
-      const url = await generateShort(tempVideoPath, videoId, clip, tempDir);
-      shortUrls.push(url);
+      try {
+        const url = await generateShort(tempVideoPath, videoId, clip, tempDir);
+        shortUrls.push(url);
+        // Add delay between processing each short
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 seconds delay
+      } catch (error) {
+        console.error('Error generating short:', error);
+        // Continue with next clip if one fails
+        continue;
+      }
     }
     
     await cleanupTempFiles(tempDir);
-    res.json({ videoId, shorts: shortUrls });
+    res.json({ 
+      videoId, 
+      shorts: shortUrls,
+      message: shortUrls.length < clips.length ? 
+        'Some shorts could not be generated due to resource constraints' : 
+        'All shorts generated successfully'
+    });
   } catch (error) {
     await cleanupTempFiles(tempDir);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message,
+      suggestion: 'Try processing a shorter video or reducing the number of shorts'
+    });
   }
 });
 
@@ -1002,20 +1057,36 @@ app.post('/getexcitingthumbnails', upload.single('video'), async (req, res) => {
       
     const thumbnailResults = [];
     for (let i = 0; i < thumbnails.length; i++) {
-      const rawPath = await extractThumbnail(tempVideoPath, thumbnails[i].timestamp, tempDir, i+1);
-      const thumbnailUrl = await enhanceThumbnail(rawPath, videoId, i+1, tempDir);
-      thumbnailResults.push({
-        url: thumbnailUrl,
-        timestamp: thumbnails[i].timestamp,
-        description: thumbnails[i].description
-      });
+      try {
+        const rawPath = await extractThumbnail(tempVideoPath, thumbnails[i].timestamp, tempDir, i+1);
+        const thumbnailUrl = await enhanceThumbnail(rawPath, videoId, i+1, tempDir);
+        thumbnailResults.push({
+          url: thumbnailUrl,
+          timestamp: thumbnails[i].timestamp,
+          description: thumbnails[i].description
+        });
+        // Add delay between processing thumbnails
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error('Error generating thumbnail:', error);
+        continue;
+      }
     }
     
     await cleanupTempFiles(tempDir);
-    res.json({ videoId, thumbnails: thumbnailResults });
+    res.json({ 
+      videoId, 
+      thumbnails: thumbnailResults,
+      message: thumbnailResults.length < thumbnails.length ?
+        'Some thumbnails could not be generated due to resource constraints' :
+        'All thumbnails generated successfully'
+    });
   } catch (error) {
     await cleanupTempFiles(tempDir);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message,
+      suggestion: 'Try processing a shorter video or reducing the number of thumbnails'
+    });
   }
 });
 
