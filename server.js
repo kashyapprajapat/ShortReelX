@@ -624,13 +624,23 @@ const os = require('os');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const xss = require("xss-clean");
+const hpp = require("hpp");
 
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// { "query": { "category": ["books", "electronics"] }} An attacker can manipulate logic by sending multiple values!
+// ✅ With hpp (Protected) The server will now receive only the last value that is electronics
+app.use(hpp()); 
+
+// security headers for request
 app.use(helmet());
-app.use(xss());    // to prevent api from this { "name": "<script>alert('Hacked!')</script>" }
+
+// to prevent api from this { "name": "<script>alert('Hacked!')</script>" }  
+// it can send from req.body, parameter etc way
+app.use(xss());    
 
 
 const limiter = rateLimit({
