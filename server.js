@@ -622,11 +622,38 @@ const streamifier = require('streamifier');
 const axios = require('axios');
 const os = require('os');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(helmet());
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000, 
+  max: 5, 
+  handler: (req, res) => {
+    res.status(429).send(`
+      <html>
+        <head>
+          <title>Too Many Requests</title>
+          <style>
+            body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8d7da; }
+            .message { text-align: center; font-size: 24px; color: #721c24; background: #f8d7da; padding: 20px; border-radius: 8px; }
+          </style>
+        </head>
+        <body>
+          <div class="message">
+            🚫 Too Many Requests! Please try again later. 🚫
+          </div>
+        </body>
+      </html>
+    `);
+  }
+});
+
+app.use(limiter);
+
 
 // Configure Cloudinary
 cloudinary.config({ 
