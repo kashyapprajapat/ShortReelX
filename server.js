@@ -625,7 +625,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const xss = require("xss-clean");
 const hpp = require("hpp");
-
+const slowDown = require("express-slow-down");
 
 const app = express();
 app.use(cors());
@@ -642,7 +642,7 @@ app.use(helmet());
 // it can send from req.body, parameter etc way
 app.use(xss());    
 
-
+// Rate Limmiter which is hardcoded means after 5 request you are bloack
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5, 
@@ -683,6 +683,15 @@ const limiter = rateLimit({
   }
 });
 
+// 🚀 Slow down repeated requests instead of blocking immediately
+// so insted of blaking we alow down aggresive devs 👨🏻‍💻
+const speedLimiter = slowDown({
+  windowMs: 60 * 1000, // 1 minute
+  delayAfter: 3, // Allow 3 requests before slowing down
+  delayMs: 1000, // Add 1 second delay per request after the limit
+});
+
+app.use(speedLimiter); // <<- Slows down requests
 app.use(limiter);
 
 
