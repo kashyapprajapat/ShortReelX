@@ -630,9 +630,11 @@ app.use(express.json());
 app.use(helmet());
 
 const limiter = rateLimit({
-  windowMs: 60 * 1000, 
+  windowMs: 60 * 1000,
   max: 5, 
   handler: (req, res) => {
+    const retryAfter = Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000); // Remaining seconds for devs 👨🏻‍💻
+
     res.status(429).send(`
       <html>
         <head>
@@ -641,10 +643,25 @@ const limiter = rateLimit({
             body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8d7da; }
             .message { text-align: center; font-size: 24px; color: #721c24; background: #f8d7da; padding: 20px; border-radius: 8px; }
           </style>
+          <script>
+            let timeLeft = ${retryAfter};
+
+            function updateTimer() {
+              if (timeLeft > 0) {
+                document.getElementById("timer").innerText = timeLeft;
+                timeLeft--;
+                setTimeout(updateTimer, 1000);
+              } else {
+                location.reload();
+              }
+            }
+
+            document.addEventListener("DOMContentLoaded", updateTimer);
+          </script>
         </head>
         <body>
           <div class="message">
-            🚫 Too Many Requests! Please try again later. 🚫
+            🚫 Too Many Requests! Please wait <span id="timer">${retryAfter}</span> seconds. 🚫
           </div>
         </body>
       </html>
