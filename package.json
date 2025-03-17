@@ -4,7 +4,8 @@
     "main": "server.js",
     "scripts": {
         "start": "node server.js",
-        "dev": "nodemon server.js"
+        "dev": "nodemon server.js",
+        "security-scan": "npx snyk test && npx retire"
     },
     "author": "Kashyap",
     "license": "ISC",
@@ -32,7 +33,9 @@
         "node-fetch": "^3.3.2",
         "nodejs-whisper": "^0.2.6",
         "path": "^0.12.7",
+        "retire": "^5.2.5",
         "sharp": "^0.33.5",
+        "snyk": "^1.1296.0",
         "streamifier": "^0.1.1",
         "uuid": "^11.1.0",
         "whisper-nodejs": "^1.0.0",
