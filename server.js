@@ -621,10 +621,12 @@ const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
 const axios = require('axios');
 const os = require('os');
+const helmet = require('helmet');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(helmet());
 
 // Configure Cloudinary
 cloudinary.config({ 
