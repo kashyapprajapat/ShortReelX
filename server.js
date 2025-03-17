@@ -623,11 +623,15 @@ const axios = require('axios');
 const os = require('os');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const xss = require("xss-clean");
+
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(helmet());
+app.use(xss());    // to prevent api from this { "name": "<script>alert('Hacked!')</script>" }
+
 
 const limiter = rateLimit({
   windowMs: 60 * 1000,
