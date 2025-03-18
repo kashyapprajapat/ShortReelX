@@ -601,7 +601,7 @@
 //=============================================================================
 //
 //
-//               Clodinary -- not use in production
+//               Clodinary -- use in production
 //
 //
 // ===============================================================================
@@ -688,7 +688,7 @@ const limiter = rateLimit({
 const speedLimiter = slowDown({
   windowMs: 60 * 1000, // 1 minute
   delayAfter: 3, // Allow 3 requests before slowing down
-  delayMs: 1000, // Add 1 second delay per request after the limit
+  delayMs: () => 1000, // Add 1 second delay per request after the limit
 });
 
 app.use(speedLimiter); // <<- Slows down requests
@@ -998,7 +998,7 @@ async function cleanupTempFiles(tempDir) {
   }
 }
 
-// Routes
+// Home 🏠 Route
 app.get('/', (req, res) => {
     res.send(`
       <!DOCTYPE html>
@@ -1111,6 +1111,7 @@ app.get('/', (req, res) => {
     `);
   });
 
+// Video upload
 app.post('/upload', upload.single('video'), async (req, res) => {
   const tempDir = getTempDir();
   try {
@@ -1136,6 +1137,7 @@ app.post('/upload', upload.single('video'), async (req, res) => {
   }
 });
 
+// Youtube shorts
 app.post('/generate-shorts', async (req, res) => {
   const tempDir = getTempDir();
   try {
@@ -1184,6 +1186,7 @@ app.post('/generate-shorts', async (req, res) => {
   }
 });
 
+// Exciting Thumbnails 
 app.post('/getexcitingthumbnails', upload.single('video'), async (req, res) => {
   const tempDir = getTempDir();
   try {
@@ -1231,6 +1234,140 @@ app.post('/getexcitingthumbnails', upload.single('video'), async (req, res) => {
     });
   }
 });
+
+// Reels 
+app.post('/generate-viral-reels', async (req, res) => {
+  const tempDir = getTempDir();
+  try {
+    const { videoId, numReels, videoUrl } = req.body;
+    if (!videoId || !videoUrl || !numReels) {
+      throw new Error('Missing required parameters: videoId, videoUrl, and numReels are required');
+    }
+    
+    // Limit number of reels to prevent resource exhaustion
+    const safeNumReels = Math.min(Math.max(parseInt(numReels), 1), 5);
+    
+    const tempVideoPath = path.join(tempDir, 'video.mp4');
+    await downloadFromCloudinary(videoUrl, tempVideoPath);
+    
+    // Extract audio and get transcript for content analysis
+    const audioPath = await extractAudio(tempVideoPath, videoId, tempDir);
+    const transcript = await transcribeAudio(audioPath, videoId, tempDir);
+    
+    // Use AI to identify viral-worthy segments and generate titles
+    const viralContent = await analyzeForViralContent(transcript, safeNumReels);
+    
+    const reelResults = [];
+    for (let i = 0; i < viralContent.reels.length; i++) {
+      try {
+        const reel = viralContent.reels[i];
+        // Generate the short video clip
+        const url = await generateShort(tempVideoPath, videoId, reel, tempDir);
+        
+        // Add to results with the AI-generated title
+        reelResults.push({
+          url: url,
+          title: reel.title,
+          description: reel.description,
+          hashtags: reel.hashtags,
+          viralScore: reel.viralScore
+        });
+        
+        // Add delay between processing each reel to prevent overloadin 👨🏻‍💻
+        await new Promise(resolve => setTimeout(resolve, 2500));
+      } catch (error) {
+        console.error('Error generating viral reel:', error);
+        continue;
+      }
+    }
+    
+    await cleanupTempFiles(tempDir);
+    res.json({ 
+      videoId, 
+      reels: reelResults,
+      message: reelResults.length < viralContent.reels.length ? 
+        'Some viral reels could not be generated due to resource constraints' : 
+        'All viral reels generated successfully',
+      aiInsights: viralContent.insights
+    });
+  } catch (error) {
+    await cleanupTempFiles(tempDir);
+    res.status(500).json({ 
+      error: error.message,
+      suggestion: 'Try processing a shorter video or reducing the number of reels'
+    });
+  }
+});
+
+// Function to analyze transcript and find viral-worthy content with AI
+async function analyzeForViralContent(transcript, numReels) {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+  const prompt = `
+  Analyze this video transcript and identify ${numReels} segments that have the highest viral potential 
+  for social media reels/short-form content. Follow these rules:
+  
+  1. Each clip must be 15-60 seconds long
+  2. Choose moments that will grab attention in the first 3 seconds
+  3. Look for emotional moments, surprising facts, or captivating stories
+  4. Focus on content that's either educational, inspirational, funny, or showcases a unique skill
+  5. For each segment, create a catchy, clickable title (max 60 chars)
+  6. Include a brief description (1-2 sentences)
+  7. Suggest 3-5 relevant hashtags for each clip
+  8. Give each clip a "viral score" from 1-10 based on its potential
+  
+  Return ONLY VALID JSON without any markdown formatting:
+  {
+    "reels": [
+      {
+        "start": number,
+        "end": number,
+        "title": "catchy viral-worthy title",
+        "description": "brief description of content",
+        "hashtags": ["tag1", "tag2", "tag3"],
+        "viralScore": number
+      }
+    ],
+    "insights": "Brief analysis of why these segments have viral potential"
+  }
+  
+  Transcript: ${transcript}
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const responseText = await result.response.text();
+    const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanedResponse);
+  } catch (error) {
+    console.error('Error parsing Gemini response for viral content:', error);
+    
+    // Fallback to basic clips if AI analysis fails
+    const reels = [];
+    const clipLength = 30; // 30 seconds per clip
+    const transcriptWords = transcript.split(' ');
+    const wordsPerSecond = 2.5; // Estimate speaking rate
+    const totalSeconds = transcriptWords.length / wordsPerSecond;
+    
+    for (let i = 0; i < numReels; i++) {
+      const startPos = (totalSeconds / (numReels + 1)) * (i + 1);
+      reels.push({
+        start: Math.max(0, startPos - (clipLength / 2)),
+        end: Math.min(totalSeconds, startPos + (clipLength / 2)),
+        title: `Engaging Moment ${i+1}`,
+        description: "Automatically generated clip from your video",
+        hashtags: ["viral", "trending", "content"],
+        viralScore: 5
+      });
+    }
+    
+    return { 
+      reels,
+      insights: "Basic clips were generated as AI content analysis encountered an error."
+    };
+  }
+}
+
 
 const PORT = process.env.PORT || 7777;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
