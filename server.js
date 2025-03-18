@@ -1000,116 +1000,145 @@ async function cleanupTempFiles(tempDir) {
 
 // Home 🏠 Route
 app.get('/', (req, res) => {
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>ShortReelX v2 - API Docs</title>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            padding: 20px; 
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background-color: #f9f9f9;
-          }
-          h1 { color: #1a73e8; }
-          .container {
-            max-width: 600px;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-          }
-          .route { 
-            margin: 20px 0; 
-            padding: 15px; 
-            border: 1px solid #ddd; 
-            border-radius: 5px; 
-            text-align: left;
-          }
-          .method { 
-            background: #1a73e8; 
-            color: white; 
-            padding: 3px 6px; 
-            border-radius: 3px; 
-            font-weight: bold;
-          }
-          .endpoint {
-            font-weight: bold;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <h1>🎥 ShortReelX v2 - API Documentation</h1>
-          <p>AI-powered video processing service</p>
-          
-          <div class="route">
-            <h3><span class="method">POST</span> <span class="endpoint">/upload</span></h3>
-            <p><strong>Description:</strong> Upload a video for processing.</p>
-            <p><strong>Headers:</strong> <code>Content-Type: multipart/form-data</code></p>
-            <p><strong>Request Body:</strong></p>
-            <ul>
-              <li><code>video</code> (file) - The video file to upload.</li>
-            </ul>
-            <p><strong>Response:</strong></p>
-            <pre>
-  {
-    "videoId": "UUID",
-    "transcript": "Extracted text from video",
-    "videoUrl": "URL to the uploaded video"
-  }
-            </pre>
-          </div>
-  
-          <div class="route">
-            <h3><span class="method">POST</span> <span class="endpoint">/generate-shorts</span></h3>
-            <p><strong>Description:</strong> Generate short clips from an uploaded video.</p>
-            <p><strong>Headers:</strong> <code>Content-Type: application/json</code></p>
-            <p><strong>Request Body:</strong></p>
-            <ul>
-              <li><code>videoId</code> (string) - ID of the uploaded video.</li>
-              <li><code>numShorts</code> (number) - Number of shorts to generate.</li>
-              <li><code>videoUrl</code> (string) - URL of the uploaded video.</li>
-            </ul>
-            <p><strong>Response:</strong></p>
-            <pre>
-  {
-    "videoId": "UUID",
-    "shorts": ["URL to short clip"],
-    "message": "All shorts generated successfully"
-  }
-            </pre>
-          </div>
-  
-          <div class="route">
-            <h3><span class="method">POST</span> <span class="endpoint">/getexcitingthumbnails</span></h3>
-            <p><strong>Description:</strong> Generate engaging thumbnails from a video.</p>
-            <p><strong>Headers:</strong> <code>Content-Type: multipart/form-data</code></p>
-            <p><strong>Request Body:</strong></p>
-            <ul>
-              <li><code>video</code> (file) - The video file.</li>
-              <li><code>numThumbnails</code> (number) - Number of thumbnails (1-3).</li>
-            </ul>
-            <p><strong>Response:</strong></p>
-            <pre>
-  {
-    "videoId": "UUID",
-    "thumbnails": ["URL to thumbnail images"],
-    "message": "All thumbnails generated successfully"
-  }
-            </pre>
-          </div>
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>ShortReelX v2 - API Docs</title>
+      <style>
+        body { 
+          font-family: Arial, sans-serif; 
+          padding: 20px; 
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          background-color: #f9f9f9;
+        }
+        h1 { color: #1a73e8; }
+        .container {
+          max-width: 600px;
+          background: white;
+          padding: 20px;
+          border-radius: 8px;
+          box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .route { 
+          margin: 20px 0; 
+          padding: 15px; 
+          border: 1px solid #ddd; 
+          border-radius: 5px; 
+          text-align: left;
+        }
+        .method { 
+          background: #1a73e8; 
+          color: white; 
+          padding: 3px 6px; 
+          border-radius: 3px; 
+          font-weight: bold;
+        }
+        .endpoint {
+          font-weight: bold;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>🎥 ShortReelX v2 - API Documentation</h1>
+        <p>AI-powered video processing service</p>
+        
+        <div class="route">
+          <h3><span class="method">POST</span> <span class="endpoint">/upload</span></h3>
+          <p><strong>Description:</strong> Upload a video for processing.</p>
+          <p><strong>Headers:</strong> <code>Content-Type: multipart/form-data</code></p>
+          <p><strong>Request Body:</strong></p>
+          <ul>
+            <li><code>video</code> (file) - The video file to upload.</li>
+          </ul>
+          <p><strong>Response:</strong></p>
+          <pre>
+{
+  "videoId": "UUID",
+  "transcript": "Extracted text from video",
+  "videoUrl": "URL to the uploaded video"
+}
+          </pre>
         </div>
-      </body>
-      </html>
-    `);
-  });
+
+        <div class="route">
+          <h3><span class="method">POST</span> <span class="endpoint">/generate-shorts</span></h3>
+          <p><strong>Description:</strong> Generate short clips from an uploaded video.</p>
+          <p><strong>Headers:</strong> <code>Content-Type: application/json</code></p>
+          <p><strong>Request Body:</strong></p>
+          <ul>
+            <li><code>videoId</code> (string) - ID of the uploaded video.</li>
+            <li><code>numShorts</code> (number) - Number of shorts to generate.</li>
+            <li><code>videoUrl</code> (string) - URL of the uploaded video.</li>
+          </ul>
+          <p><strong>Response:</strong></p>
+          <pre>
+{
+  "videoId": "UUID",
+  "shorts": ["URL to short clip"],
+  "message": "All shorts generated successfully"
+}
+          </pre>
+        </div>
+
+        <div class="route">
+          <h3><span class="method">POST</span> <span class="endpoint">/getexcitingthumbnails</span></h3>
+          <p><strong>Description:</strong> Generate engaging thumbnails from a video.</p>
+          <p><strong>Headers:</strong> <code>Content-Type: multipart/form-data</code></p>
+          <p><strong>Request Body:</strong></p>
+          <ul>
+            <li><code>video</code> (file) - The video file.</li>
+            <li><code>numThumbnails</code> (number) - Number of thumbnails (1-3).</li>
+          </ul>
+          <p><strong>Response:</strong></p>
+          <pre>
+{
+  "videoId": "UUID",
+  "thumbnails": ["URL to thumbnail images"],
+  "message": "All thumbnails generated successfully"
+}
+          </pre>
+        </div>
+
+        <div class="route">
+          <h3><span class="method">POST</span> <span class="endpoint">/generate-viral-reels</span></h3>
+          <p><strong>Description:</strong> Generate viral-optimized reels with catchy titles from an uploaded video.</p>
+          <p><strong>Headers:</strong> <code>Content-Type: application/json</code></p>
+          <p><strong>Request Body:</strong></p>
+          <ul>
+            <li><code>videoId</code> (string) - ID of the uploaded video.</li>
+            <li><code>videoUrl</code> (string) - URL of the uploaded video.</li>
+            <li><code>numReels</code> (number) - Number of viral reels to generate (max 5).</li>
+          </ul>
+          <p><strong>Response:</strong></p>
+          <pre>
+{
+  "videoId": "UUID",
+  "reels": [
+    {
+      "url": "URL to reel clip",
+      "title": "Catchy viral-worthy title",
+      "description": "Brief description of content",
+      "hashtags": ["tag1", "tag2", "tag3"],
+      "viralScore": 8.5
+    }
+  ],
+  "message": "All viral reels generated successfully",
+  "aiInsights": "Brief analysis of viral potential"
+}
+          </pre>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+});
 
 // Video upload
 app.post('/upload', upload.single('video'), async (req, res) => {
