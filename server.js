@@ -1134,6 +1134,29 @@ app.get('/', (req, res) => {
 }
           </pre>
         </div>
+        
+        <div class="route">
+          <h3><span class="method">POST</span> <span class="endpoint">/generate-subtitles</span></h3>
+          <p><strong>Description:</strong> Generate subtitle files (SRT and VTT) from a video with optional styled video.</p>
+          <p><strong>Headers:</strong> <code>Content-Type: multipart/form-data</code></p>
+          <p><strong>Request Body:</strong></p>
+          <ul>
+            <li><code>video</code> (file) - The video file to generate subtitles for.</li>
+            <li><code>generateStyledVideo</code> (string) - Set to 'true' to generate a video with styled subtitles.</li>
+          </ul>
+          <p><strong>Response:</strong></p>
+          <pre>
+{
+  "videoId": "UUID",
+  "subtitles": {
+    "srt": "URL to SRT subtitle file",
+    "vtt": "URL to VTT subtitle file",
+    "styledVideo": "URL to video with styled subtitles (if requested)"
+  },
+  "message": "Subtitles generated successfully"
+}
+          </pre>
+        </div>
       </div>
     </body>
     </html>
