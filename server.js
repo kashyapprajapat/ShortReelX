@@ -1397,6 +1397,217 @@ async function analyzeForViralContent(transcript, numReels) {
   }
 }
 
+// Generate subtitles
+app.post('/generate-subtitles', upload.single('video'), async (req, res) => {
+  const tempDir = getTempDir();
+  try {
+    if (!req.file) throw new Error('No video uploaded');
+    
+    const videoId = uuidv4();
+    const tempVideoPath = path.join(tempDir, 'video.mp4');
+    fs.writeFileSync(tempVideoPath, req.file.buffer);
+    
+    // Extract audio 
+    const audioPath = await extractAudio(tempVideoPath, videoId, tempDir);
+    
+    // Get  transcript with timestamps using HuggingFace
+    const detailedTranscript = await generateTimestampedTranscript(audioPath, videoId);
+    
+    // Generate SRT file
+    const srtPath = await createSRTFile(detailedTranscript, tempDir, videoId);
+    
+    // Generate VTT file (Web Video Text Tracks format)
+    const vttPath = await createVTTFile(detailedTranscript, tempDir, videoId);
+    
+    // Upload subtitle files to Cloudinary
+    const srtResult = await uploadFileToCloudinary(srtPath, `${videoId}/subtitles`, 'subtitles-srt');
+    const vttResult = await uploadFileToCloudinary(vttPath, `${videoId}/subtitles`, 'subtitles-vtt');
+    
+    // Optional: Generate styled subtitle video
+    const styledVideoUrl = req.body.generateStyledVideo === 'true' ? 
+      await createStyledSubtitleVideo(tempVideoPath, srtPath, videoId, tempDir) : null;
+    
+    await cleanupTempFiles(tempDir);
+    res.json({ 
+      videoId, 
+      subtitles: {
+        srt: srtResult.secure_url,
+        vtt: vttResult.secure_url,
+        styledVideo: styledVideoUrl
+      },
+      message: 'Subtitles generated successfully'
+    });
+  } catch (error) {
+    await cleanupTempFiles(tempDir);
+    res.status(500).json({ 
+      error: error.message,
+      suggestion: 'Make sure the video has clear audio and try again'
+    });
+  }
+});
+
+// Generate timestamped transcript with word-level timing
+async function generateTimestampedTranscript(audioPath, videoId) {
+  const chunks = await splitAudio(audioPath, videoId, getTempDir());
+  let detailedTranscript = [];
+  
+  for (const chunk of chunks.localPaths) {
+    const audioBuffer = fs.readFileSync(chunk);
+    try {
+      // Using Hugging Face for timestamped transcription
+      const response = await hf.automaticSpeechRecognition({
+        model: "openai/whisper-large",
+        data: audioBuffer,
+        parameters: { 
+          return_timestamps: true,
+          word_timestamps: true  
+        }
+      });
+      
+    
+      if (response.chunks) {
+        // API returns word-level chunks
+        detailedTranscript = detailedTranscript.concat(response.chunks);
+      } else {
+        // only sentence-level timestamps are available
+        detailedTranscript.push({
+          text: response.text,
+          timestamp: [response.start || 0, response.end || 0]
+        });
+      }
+    } catch (error) {
+      console.error('Error in transcription:', error);
+      // Fall back to simpler transcription method if detailed fails
+      const response = await hf.automaticSpeechRecognition({
+        model: "openai/whisper-large",
+        data: audioBuffer,
+        parameters: { return_timestamps: true }
+      });
+      
+      // Parse timestamps from text if they're embedded like [0:05-0:10]
+      const timestampRegex = /\[(\d+:\d+)-(\d+:\d+)\]/g;
+      const matches = [...response.text.matchAll(timestampRegex)];
+      
+      if (matches.length > 0) {
+        for (const match of matches) {
+          const startTime = convertTimestampToSeconds(match[1]);
+          const endTime = convertTimestampToSeconds(match[2]);
+          const textSegment = response.text.replace(match[0], '').trim();
+          
+          detailedTranscript.push({
+            text: textSegment,
+            timestamp: [startTime, endTime]
+          });
+        }
+      } else {
+        // If no embedded timestamps, estimate based on text length
+        const words = response.text.split(' ');
+        const avgWordDuration = 0.4; // Average word duration in seconds
+        const duration = words.length * avgWordDuration;
+        
+        detailedTranscript.push({
+          text: response.text,
+          timestamp: [0, duration]
+        });
+      }
+    }
+    
+    // Add delay between chunks to prevent rate limiting
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  return detailedTranscript;
+}
+
+// Helper function to convert timestamp format to seconds
+function convertTimestampToSeconds(timestamp) {
+  const parts = timestamp.split(':');
+  return parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+}
+
+// Create SRT subtitle file
+async function createSRTFile(transcript, tempDir, videoId) {
+  const srtPath = path.join(tempDir, 'subtitles.srt');
+  let srtContent = '';
+  
+  transcript.forEach((segment, index) => {
+    srtContent += `${index + 1}\n`;
+ 
+    const startTime = formatSRTTimestamp(segment.timestamp[0]);
+    const endTime = formatSRTTimestamp(segment.timestamp[1]);
+    srtContent += `${startTime} --> ${endTime}\n`;
+    
+    srtContent += `${segment.text}\n\n`;
+  });
+  
+  fs.writeFileSync(srtPath, srtContent);
+  return srtPath;
+}
+
+// Create WebVTT subtitle file
+async function createVTTFile(transcript, tempDir, videoId) {
+  const vttPath = path.join(tempDir, 'subtitles.vtt');
+  let vttContent = 'WEBVTT\n\n';
+  
+  transcript.forEach((segment, index) => {
+   
+    vttContent += `${index + 1}\n`;
+    
+
+    const startTime = formatVTTTimestamp(segment.timestamp[0]);
+    const endTime = formatVTTTimestamp(segment.timestamp[1]);
+    vttContent += `${startTime} --> ${endTime}\n`;
+  
+    vttContent += `${segment.text}\n\n`;
+  });
+  
+  fs.writeFileSync(vttPath, vttContent);
+  return vttPath;
+}
+
+// Format timestamp for SRT files
+function formatSRTTimestamp(seconds) {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 1000);
+  
+  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+}
+
+// Format timestamp for VTT files
+function formatVTTTimestamp(seconds) {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 1000);
+  
+  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
+}
+
+// Create a video with styled burned-in subtitles
+async function createStyledSubtitleVideo(videoPath, srtPath, videoId, tempDir) {
+  const outputPath = path.join(tempDir, `${videoId}-subtitled.mp4`);
+  
+  await new Promise((resolve, reject) => {
+    ffmpeg(videoPath)
+      .outputOptions([
+        '-vf', `subtitles=${srtPath}:force_style='FontName=Arial,FontSize=24,PrimaryColour=&H00FFFFFF,BackColour=&H80000000,BorderStyle=4'`,
+        '-threads 2',
+        '-preset ultrafast',
+        '-crf 28'
+      ])
+      .output(outputPath)
+      .on('end', resolve)
+      .on('error', reject)
+      .run();
+  });
+  
+  const result = await uploadFileToCloudinary(outputPath, `${videoId}/styled-video`, 'subtitled-video');
+  return result.secure_url;
+}
+
+
 
 const PORT = process.env.PORT || 7777;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
