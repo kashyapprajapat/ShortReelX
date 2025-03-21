@@ -1637,15 +1637,81 @@ app.get('/ping', (req, res) => {
 
 // system health route
 app.get('/health', (req, res) => {
-  const healthInfo = {
-      uptime: process.uptime(),
-      memoryUsage: process.memoryUsage(),
-      cpuUsage: process.cpuUsage(),
-      loadAverage: os.loadavg(),
-      freeMemory: os.freemem(),
-      totalMemory: os.totalmem(),
+  const formatBytes = (bytes) => `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  const formatPercent = (value) => `${Math.round(value * 100)}%`;
+  
+  const metrics = {
+      uptime: `${process.uptime().toFixed(2)} sec`,
+      memory: {
+          used: formatBytes(process.memoryUsage().rss),
+          total: formatBytes(os.totalmem()),
+          percentage: process.memoryUsage().rss / os.totalmem()
+      },
+      cpu: {
+          usage: process.cpuUsage().user / 1000000, // convert microseconds to seconds
+          load: os.loadavg().map(v => v.toFixed(2))
+      },
+      system: {
+          free: formatBytes(os.freemem()),
+          load: os.loadavg()[0].toFixed(2)
+      }
   };
-  res.json(healthInfo);
+
+  const createBar = (percentage, length = 20) => {
+      const filled = '█'.repeat(Math.round(percentage * length));
+      const empty = '░'.repeat(length - filled.length);
+      return `[${filled}${empty}] ${formatPercent(percentage)}`;
+  };
+
+  const healthDashboard = `
+  <style>
+      body { font-family: Monaco, monospace; padding: 20px; background: #1a1a1a; color: #00ff00; }
+      .container { max-width: 600px; margin: 0 auto; }
+      .metric { margin: 15px 0; }
+      .bar { color: #4CAF50; }
+      .label { margin-bottom: 5px; }
+  </style>
+  <div class="container">
+      <h2>🚦 System Health Dashboard</h2>
+      
+      <div class="metric">
+          <div class="label">Memory Usage:</div>
+          <div class="bar">${createBar(metrics.memory.percentage)}</div>
+          <div>${metrics.memory.used} / ${metrics.memory.total}</div>
+      </div>
+
+      <div class="metric">
+          <div class="label">CPU Load (1/5/15 min):</div>
+          <div class="bar">${createBar(metrics.cpu.load[0] / os.cpus().length)}</div>
+          <div>${metrics.cpu.load.join(' / ')}</div>
+      </div>
+
+      <div class="metric">
+          <div class="label">System Load:</div>
+          <pre>
+          ${Array.from({length: 20}, (_, i) => 
+              i < metrics.system.load * 4 ? '▓' : '░'
+          ).join('')}
+          </pre>
+      </div>
+
+      <div class="metric">
+          <h3>📊 Resource Allocation</h3>
+          <pre>
+          CPU Cores: ${'⬤ '.repeat(os.cpus().length)}
+          Memory:    ${'⬤'.repeat(Math.floor(metrics.memory.percentage * 10))}
+          </pre>
+      </div>
+
+      <div class="metric">
+          <h3>🕒 Uptime</h3>
+          <progress value="${process.uptime()}" max="86400"></progress>
+          <div>${metrics.uptime}</div>
+      </div>
+  </div>
+  `;
+
+  res.send(healthDashboard);
 });
 
 
