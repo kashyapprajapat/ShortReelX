@@ -1635,5 +1635,20 @@ app.get('/ping', (req, res) => {
   res.send('pong');
 });
 
+// system health route
+app.get('/health', (req, res) => {
+  const healthInfo = {
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+      cpuUsage: process.cpuUsage(),
+      loadAverage: os.loadavg(),
+      freeMemory: os.freemem(),
+      totalMemory: os.totalmem(),
+  };
+  res.json(healthInfo);
+});
+
+
+
 const PORT = process.env.PORT || 7777;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
