@@ -1641,74 +1641,336 @@ app.get('/health', (req, res) => {
   const formatPercent = (value) => `${Math.round(value * 100)}%`;
   
   const metrics = {
-      uptime: `${process.uptime().toFixed(2)} sec`,
-      memory: {
-          used: formatBytes(process.memoryUsage().rss),
-          total: formatBytes(os.totalmem()),
-          percentage: process.memoryUsage().rss / os.totalmem()
-      },
-      cpu: {
-          usage: process.cpuUsage().user / 1000000, // convert microseconds to seconds
-          load: os.loadavg().map(v => v.toFixed(2))
-      },
-      system: {
-          free: formatBytes(os.freemem()),
-          load: os.loadavg()[0].toFixed(2)
-      }
+    uptime: `${process.uptime().toFixed(2)} sec`,
+    memory: {
+      used: formatBytes(process.memoryUsage().rss),
+      total: formatBytes(os.totalmem()),
+      percentage: process.memoryUsage().rss / os.totalmem()
+    },
+    cpu: {
+      usage: process.cpuUsage().user / 1000000, // convert microseconds to seconds
+      load: os.loadavg().map(v => v.toFixed(2))
+    },
+    system: {
+      free: formatBytes(os.freemem()),
+      load: os.loadavg()[0].toFixed(2)
+    }
   };
 
-  const createBar = (percentage, length = 20) => {
-      const filled = '█'.repeat(Math.round(percentage * length));
-      const empty = '░'.repeat(length - filled.length);
-      return `[${filled}${empty}] ${formatPercent(percentage)}`;
+  // Calculate health status
+  const getHealthStatus = () => {
+    const memoryThreshold = metrics.memory.percentage > 0.8 ? 'critical' : 
+                          metrics.memory.percentage > 0.6 ? 'warning' : 'healthy';
+    const cpuThreshold = metrics.cpu.load[0] / os.cpus().length > 0.8 ? 'critical' : 
+                       metrics.cpu.load[0] / os.cpus().length > 0.6 ? 'warning' : 'healthy';
+    
+    if (memoryThreshold === 'critical' || cpuThreshold === 'critical') return 'critical';
+    if (memoryThreshold === 'warning' || cpuThreshold === 'warning') return 'warning';
+    return 'healthy';
+  };
+
+  const status = getHealthStatus();
+  const statusColors = {
+    healthy: '#4CAF50',
+    warning: '#FF9800',
+    critical: '#F44336'
+  };
+
+  const createBar = (percentage, length = 20, customColor = null) => {
+    const color = customColor || (
+      percentage > 0.8 ? '#F44336' : 
+      percentage > 0.6 ? '#FF9800' : 
+      '#4CAF50'
+    );
+    
+    const filled = Math.round(percentage * length);
+    return `<div class="progress-bar">
+      <div class="progress-fill" style="width: ${percentage * 100}%; background-color: ${color};"></div>
+    </div>
+    <div class="progress-text">${formatPercent(percentage)}</div>`;
+  };
+
+  const uptimeFormatted = () => {
+    const uptime = process.uptime();
+    const days = Math.floor(uptime / 86400);
+    const hours = Math.floor((uptime % 86400) / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const seconds = Math.floor(uptime % 60);
+    
+    if (days > 0) return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
   };
 
   const healthDashboard = `
-  <style>
-      body { font-family: Monaco, monospace; padding: 20px; background: #1a1a1a; color: #00ff00; }
-      .container { max-width: 600px; margin: 0 auto; }
-      .metric { margin: 15px 0; }
-      .bar { color: #4CAF50; }
-      .label { margin-bottom: 5px; }
-  </style>
-  <div class="container">
-      <h2>🚦 System Health Dashboard</h2>
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Health Dashboard</title>
+    <style>
+      :root {
+        --bg-color: #1a1a2e;
+        --panel-bg: #16213e;
+        --text-color: #e6e6e6;
+        --accent-color: #0f3460;
+        --healthy: #4CAF50;
+        --warning: #FF9800;
+        --critical: #F44336;
+        --muted-text: #a0a0a0;
+      }
       
-      <div class="metric">
-          <div class="label">Memory Usage:</div>
-          <div class="bar">${createBar(metrics.memory.percentage)}</div>
-          <div>${metrics.memory.used} / ${metrics.memory.total}</div>
-      </div>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: 'Roboto Mono', Monaco, monospace;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        line-height: 1.6;
+        padding: 20px;
+      }
+      
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background-color: var(--panel-bg);
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      }
+      
+      .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #333;
+      }
+      
+      .status-indicator {
+        display: flex;
+        align-items: center;
+      }
+      
+      .status-dot {
+        height: 12px;
+        width: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+      
+      .timestamp {
+        font-size: 0.8rem;
+        color: var(--muted-text);
+      }
 
-      <div class="metric">
-          <div class="label">CPU Load (1/5/15 min):</div>
-          <div class="bar">${createBar(metrics.cpu.load[0] / os.cpus().length)}</div>
-          <div>${metrics.cpu.load.join(' / ')}</div>
-      </div>
+      h2, h3 {
+        color: #fff;
+        font-weight: 400;
+        margin-bottom: 15px;
+      }
+      
+      .metric-card {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 20px;
+        border-left: 4px solid var(--accent-color);
+      }
+      
+      .metric {
+        margin: 12px 0;
+      }
+      
+      .label {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+      
+      .progress-bar {
+        height: 12px;
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 5px;
+      }
+      
+      .progress-fill {
+        height: 100%;
+        border-radius: 6px;
+        transition: width 0.5s ease;
+      }
+      
+      .progress-text {
+        font-size: 12px;
+        text-align: right;
+        color: var(--muted-text);
+      }
+      
+      .resource-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 10px;
+        margin-top: 15px;
+      }
+      
+      .resource-icon {
+        text-align: center;
+        font-size: 24px;
+        padding: 10px;
+        color: var(--healthy);
+      }
+      
+      .resource-label {
+        font-size: 12px;
+        text-align: center;
+        color: var(--muted-text);
+      }
+      
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      
+      @media (max-width: 600px) {
+        .metrics-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      
+      footer {
+        text-align: center;
+        margin-top: 30px;
+        font-size: 12px;
+        color: var(--muted-text);
+      }
 
-      <div class="metric">
-          <div class="label">System Load:</div>
-          <pre>
-          ${Array.from({length: 20}, (_, i) => 
-              i < metrics.system.load * 4 ? '▓' : '░'
-          ).join('')}
-          </pre>
-      </div>
+      .uptime-display {
+        text-align: center;
+        margin: 20px 0;
+      }
 
-      <div class="metric">
-          <h3>📊 Resource Allocation</h3>
-          <pre>
-          CPU Cores: ${'⬤ '.repeat(os.cpus().length)}
-          Memory:    ${'⬤'.repeat(Math.floor(metrics.memory.percentage * 10))}
-          </pre>
-      </div>
+      .uptime-display .value {
+        font-size: 24px;
+        font-weight: bold;
+        margin: 10px 0;
+        color: #fff;
+      }
 
-      <div class="metric">
-          <h3>🕒 Uptime</h3>
-          <progress value="${process.uptime()}" max="86400"></progress>
-          <div>${metrics.uptime}</div>
+      .data-value {
+        font-family: 'Courier New', monospace;
+        background-color: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 0.9em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="dashboard-header">
+        <h2>🚦 System Health Dashboard</h2>
+        <div>
+          <div class="status-indicator">
+            <div class="status-dot" style="background-color: ${statusColors[status]};"></div>
+            <span>${status.toUpperCase()}</span>
+          </div>
+          <div class="timestamp">Last updated: ${new Date().toLocaleTimeString()}</div>
+        </div>
       </div>
-  </div>
+      
+      <div class="uptime-display">
+        <h3>⏱️ System Uptime</h3>
+        <div class="value">${uptimeFormatted()}</div>
+      </div>
+      
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <h3>💾 Memory</h3>
+          <div class="metric">
+            <div class="label">
+              <span>Usage</span>
+              <span>${metrics.memory.used} / ${metrics.memory.total}</span>
+            </div>
+            ${createBar(metrics.memory.percentage)}
+          </div>
+          
+          <div class="metric">
+            <div class="label">
+              <span>Free Memory</span>
+              <span class="data-value">${metrics.system.free}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="metric-card">
+          <h3>⚙️ CPU</h3>
+          <div class="metric">
+            <div class="label">
+              <span>Load Average</span>
+              <span class="data-value">${metrics.cpu.load.join(' / ')}</span>
+            </div>
+            ${createBar(metrics.cpu.load[0] / os.cpus().length)}
+          </div>
+          
+          <div class="metric">
+            <div class="label">
+              <span>CPU Cores</span>
+              <span class="data-value">${os.cpus().length}</span>
+            </div>
+            <div class="resource-grid">
+              ${Array.from({length: Math.min(os.cpus().length, 16)}, (_, i) => 
+                `<div class="resource-icon">⚙️</div>`
+              ).join('')}
+              ${os.cpus().length > 16 ? '<div class="resource-icon">+' + (os.cpus().length - 16) + '</div>' : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="metric-card">
+        <h3>📊 System Load</h3>
+        <div class="metric">
+          <div class="label">
+            <span>1 minute average</span>
+            <span class="data-value">${metrics.cpu.load[0]}</span>
+          </div>
+          ${createBar(metrics.cpu.load[0] / os.cpus().length)}
+        </div>
+        
+        <div class="metric">
+          <div class="label">
+            <span>5 minute average</span>
+            <span class="data-value">${metrics.cpu.load[1]}</span>
+          </div>
+          ${createBar(metrics.cpu.load[1] / os.cpus().length)}
+        </div>
+        
+        <div class="metric">
+          <div class="label">
+            <span>15 minute average</span>
+            <span class="data-value">${metrics.cpu.load[2]}</span>
+          </div>
+          ${createBar(metrics.cpu.load[2] / os.cpus().length)}
+        </div>
+      </div>
+      
+      <footer>
+        <p>Node.js ${process.version} | OS: ${os.type()} ${os.release()}</p>
+      </footer>
+    </div>
+  </body>
+  </html>
   `;
 
   res.send(healthDashboard);
