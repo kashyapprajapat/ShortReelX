@@ -1976,6 +1976,18 @@ app.get('/health', (req, res) => {
   res.send(healthDashboard);
 });
 
+// Server info endpoint
+app.get('/info', (req, res) => {
+  res.json({
+    name: 'ShortReelX v2',
+    version: '2.0.0', 
+    description: 'AI-powered video processing service',
+    nodeVersion: process.version,
+    platform: process.platform,
+    uptime: process.uptime(),
+    startTime: new Date(Date.now() - (process.uptime() * 1000)).toISOString()
+  });
+});
 
 
 const PORT = process.env.PORT || 7777;
