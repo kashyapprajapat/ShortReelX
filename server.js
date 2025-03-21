@@ -1630,7 +1630,10 @@ async function createStyledSubtitleVideo(videoPath, srtPath, videoId, tempDir) {
   return result.secure_url;
 }
 
-
+// to check service is live or not
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
 
 const PORT = process.env.PORT || 7777;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
