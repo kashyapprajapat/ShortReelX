@@ -1989,6 +1989,21 @@ app.get('/info', (req, res) => {
   });
 });
 
+// =============================================
+// Middleware for admin to shutdown whole system
+// =============================================
+const authenticateAdmin = (req, res, next) => {
+  const adminToken = req.headers['x-admin-token'];
+  if (adminToken === process.env.ADMIN_TOKEN) return next();
+  res.status(403).json({ error: 'Forbidden' });
+};
+
+// Secure Shutdown
+app.post('/shutdown', authenticateAdmin, (req, res) => {
+  res.json({ message: 'Server shutting down gracefully' });
+  console.log('🔒 Received secure shutdown command');
+  process.exit(0);
+});
 
 const PORT = process.env.PORT || 7777;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
