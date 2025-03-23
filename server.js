@@ -1157,6 +1157,52 @@ app.get('/', (req, res) => {
 }
           </pre>
         </div>
+
+        <div class="route">
+          <h3><span class="method">GET</span> <span class="endpoint">/health</span></h3>
+          <p><strong>Description:</strong> Check system health and resource usage.</p>
+          <p><strong>Headers:</strong> None required</p>
+          <p><strong>Request Body:</strong> None</p>
+          <p><strong>Response:</strong> HTML dashboard showing:</p>
+          <ul>
+            <li>System uptime</li>
+            <li>Memory usage and availability</li>
+            <li>CPU utilization and load</li>
+            <li>Overall system health status (healthy, warning, critical)</li>
+          </ul>
+        </div>
+
+        <div class="route">
+          <h3><span class="method">GET</span> <span class="endpoint">/info</span></h3>
+          <p><strong>Description:</strong> Get server information.</p>
+          <p><strong>Headers:</strong> None required</p>
+          <p><strong>Request Body:</strong> None</p>
+          <p><strong>Response:</strong></p>
+          <pre>
+{
+  "name": "ShortReelX v2",
+  "version": "2.0.0",
+  "description": "AI-powered video processing service",
+  "nodeVersion": "v16.x.x",
+  "platform": "linux",
+  "uptime": 12345.67,
+  "startTime": "2025-03-23T12:34:56.789Z"
+}
+          </pre>
+        </div>
+
+        <div class="route">
+          <h3><span class="method">POST</span> <span class="endpoint">/shutdown</span></h3>
+          <p><strong>Description:</strong> Secure endpoint to gracefully shut down the server (admin only).</p>
+          <p><strong>Headers:</strong> <code>x-admin-token: [admin token]</code></p>
+          <p><strong>Request Body:</strong> None</p>
+          <p><strong>Response:</strong></p>
+          <pre>
+{
+  "message": "Server shutting down gracefully"
+}
+          </pre>
+        </div>
       </div>
     </body>
     </html>
