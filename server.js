@@ -628,7 +628,27 @@ const hpp = require("hpp");
 const slowDown = require("express-slow-down");
 
 const app = express();
-app.use(cors());
+
+const allowedOrigins = [
+  "https://shortreelx-6l7e.onrender.com",
+  "https://shortreelx.vercel.app",
+  "http://localhost:3000", // Frontend dev
+];
+
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+  })
+);
+
+
 app.use(express.json());
 
 // { "query": { "category": ["books", "electronics"] }} An attacker can manipulate logic by sending multiple values!
