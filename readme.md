@@ -122,6 +122,10 @@ Applies enhancement filters (brightness, contrast, sharpening)
 
 
 ---
+### Get Enhanced Thumbnails
+![Alt Text](./EnhancedThumbanisl.png)
+
+---
 
 ## Forking the Project
 If you want to contribute or customize the project, follow these steps:
