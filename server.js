@@ -2055,6 +2055,56 @@ app.get('/info', (req, res) => {
   });
 });
 
+// Enhanced Thumbnail
+// Add this route after your other routes
+app.post('/enhance-thumbnail', upload.single('image'), async (req, res) => {
+  const tempDir = getTempDir();
+  try {
+    if (!req.file) throw new Error('No image uploaded');
+    
+    const imageId = uuidv4();
+    const originalPath = path.join(tempDir, 'original-' + req.file.originalname);
+    fs.writeFileSync(originalPath, req.file.buffer);
+    
+    const enhancedPath = path.join(tempDir, 'enhanced-' + req.file.originalname);
+    
+    // Enhance the image using FFmpeg
+    await new Promise((resolve, reject) => {
+      ffmpeg(originalPath)
+        .outputOptions([
+          '-threads 2',
+          '-preset ultrafast'
+        ])
+        .videoFilters([
+          { filter: 'eq', options: { brightness: '0.05', contrast: '1.2', saturation: '1.3' } },
+          { filter: 'unsharp', options: { luma_msize_x: 5, luma_msize_y: 5, luma_amount: 1.0 } },
+          { filter: 'format', options: 'rgb24' } // Ensure proper color format
+        ])
+        .output(enhancedPath)
+        .on('end', resolve)
+        .on('error', reject)
+        .run();
+    });
+    
+    // Upload the enhanced image to Cloudinary
+    const result = await uploadFileToCloudinary(enhancedPath, `enhanced-thumbnails/${imageId}`, 'enhanced');
+    
+    await cleanupTempFiles(tempDir);
+    res.json({
+      imageId,
+      originalUrl: await uploadFileToCloudinary(originalPath, `enhanced-thumbnails/${imageId}`, 'original'),
+      enhancedUrl: result.secure_url,
+      message: 'Image enhanced successfully'
+    });
+  } catch (error) {
+    await cleanupTempFiles(tempDir);
+    res.status(500).json({ 
+      error: error.message,
+      suggestion: 'Please ensure the image file is valid and try again'
+    });
+  }
+});
+
 // =============================================
 // Middleware for admin to shutdown whole system
 // =============================================
