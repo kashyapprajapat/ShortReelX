@@ -2056,52 +2056,51 @@ app.get('/info', (req, res) => {
 });
 
 // Enhanced Thumbnail
-// Add this route after your other routes
-app.post('/enhance-thumbnail', upload.single('image'), async (req, res) => {
-  const tempDir = getTempDir();
+app.post('/enhanced-thumbnail', upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) throw new Error('No image uploaded');
-    
-    const imageId = uuidv4();
-    const originalPath = path.join(tempDir, 'original-' + req.file.originalname);
-    fs.writeFileSync(originalPath, req.file.buffer);
-    
-    const enhancedPath = path.join(tempDir, 'enhanced-' + req.file.originalname);
-    
-    // Enhance the image using FFmpeg
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file uploaded' });
+    }
+
+    const tempDir = getTempDir();
+    const uniqueId = uuidv4();
+    const inputPath = path.join(tempDir, `original-${uniqueId}.jpg`);
+    const enhancedPath = path.join(tempDir, `enhanced-${uniqueId}.jpg`);
+
+    // Write the uploaded file to disk
+    fs.writeFileSync(inputPath, req.file.buffer);
+
+    // Enhance the image using ffmpeg (similar to your existing enhanceThumbnail function)
     await new Promise((resolve, reject) => {
-      ffmpeg(originalPath)
+      ffmpeg(inputPath)
+        .videoFilters([
+          { filter: 'eq', options: { brightness: '0.05', contrast: '1.2', saturation: '1.3' } },
+          { filter: 'unsharp', options: { luma_msize_x: 5, luma_msize_y: 5, luma_amount: 1.0 } }
+        ])
         .outputOptions([
           '-threads 2',
           '-preset ultrafast'
-        ])
-        .videoFilters([
-          { filter: 'eq', options: { brightness: '0.05', contrast: '1.2', saturation: '1.3' } },
-          { filter: 'unsharp', options: { luma_msize_x: 5, luma_msize_y: 5, luma_amount: 1.0 } },
-          { filter: 'format', options: 'rgb24' } // Ensure proper color format
         ])
         .output(enhancedPath)
         .on('end', resolve)
         .on('error', reject)
         .run();
     });
-    
-    // Upload the enhanced image to Cloudinary
-    const result = await uploadFileToCloudinary(enhancedPath, `enhanced-thumbnails/${imageId}`, 'enhanced');
-    
-    await cleanupTempFiles(tempDir);
+
+    // Upload enhanced image to Cloudinary
+    const result = await uploadFileToCloudinary(enhancedPath, 'enhanced-thumbnails', uniqueId);
+
+    // Clean up temp files
+    cleanupTempFiles(tempDir);
+
+    // Return the enhanced image URL
     res.json({
-      imageId,
-      originalUrl: await uploadFileToCloudinary(originalPath, `enhanced-thumbnails/${imageId}`, 'original'),
-      enhancedUrl: result.secure_url,
-      message: 'Image enhanced successfully'
+      success: true,
+      enhancedImageUrl: result.secure_url
     });
   } catch (error) {
-    await cleanupTempFiles(tempDir);
-    res.status(500).json({ 
-      error: error.message,
-      suggestion: 'Please ensure the image file is valid and try again'
-    });
+    console.error('Error enhancing thumbnail:', error);
+    res.status(500).json({ error: 'Failed to enhance thumbnail', details: error.message });
   }
 });
 
