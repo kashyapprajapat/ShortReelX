@@ -3,7 +3,8 @@ HUGGINGFACE_API_KEY=<Your whisper hugging face api ky>
 CLOUDINARY_CLOUD_NAME=<Your_cloude_name>
 CLOUDINARY_API_KEY=<Your_cloude_API_Key>
 CLOUDINARY_API_SECRET=<Your_cloude_API_SECRET>
-
+<!-- This url is allowd for frontend develoepr use in developement  -->
+ALLOWED_ORIGINS=http://localhost:3000   
 
 <!-- ❌ Dont Use in Development   -->
 ADMIN_TOKEN=<dont provide in development not use>
