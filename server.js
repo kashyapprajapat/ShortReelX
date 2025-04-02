@@ -626,7 +626,7 @@ const rateLimit = require('express-rate-limit');
 const xss = require("xss-clean");
 const hpp = require("hpp");
 const slowDown = require("express-slow-down");
-
+const logger = require("./middleware/logger")
 const app = express();
 
 const allowedOrigins = [
@@ -714,6 +714,8 @@ const speedLimiter = slowDown({
 app.use(speedLimiter); // <<- Slows down requests
 app.use(limiter);
 
+// logger middleware
+app.use(logger); 
 
 // Configure Cloudinary
 cloudinary.config({ 
