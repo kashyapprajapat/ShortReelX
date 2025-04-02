@@ -629,12 +629,11 @@ const slowDown = require("express-slow-down");
 const logger = require("./middleware/logger")
 const app = express();
 
-const allowedOrigins = [
-  "https://shortreelx-6l7e.onrender.com",
-  "https://shortreelx.vercel.app",
-  "http://localhost:3000", // Frontend dev
-];
 
+// Get allowed origins from .env
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",")
+  : [];
 
 app.use(
   cors({
