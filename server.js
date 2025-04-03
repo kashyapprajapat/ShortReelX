@@ -1178,6 +1178,38 @@ app.get('/', (req, res) => {
 }
           </pre>
         </div>
+        
+<div class="route">
+  <h3><span class="method">POST</span> <span class="endpoint">/enhanced-thumbnail</span></h3>
+  <p><strong>Description:</strong> Enhance and optimize an image thumbnail for better visual appeal.</p>
+  <p><strong>Headers:</strong> <code>Content-Type: multipart/form-data</code></p>
+  <p><strong>Request Body:</strong></p>
+  <ul>
+    <li><code>image</code> (file) - The image file to enhance (JPG/PNG recommended).</li>
+  </ul>
+  <p><strong>Enhancements Applied:</strong></p>
+  <ul>
+    <li>Brightness adjustment (+5%)</li>
+    <li>Contrast boost (1.2x)</li>
+    <li>Saturation increase (1.3x)</li>
+    <li>Unsharp masking for clarity</li>
+  </ul>
+  <p><strong>Response:</strong></p>
+  <pre>
+{
+  "success": true,
+  "enhancedImageUrl": "URL to the enhanced thumbnail image"
+}
+  </pre>
+  <p><strong>Error Response:</strong></p>
+  <pre>
+{
+  "error": "Error message",
+  "details": "Additional error details if available"
+}
+  </pre>
+</div>
+
 
         <div class="route">
           <h3><span class="method">GET</span> <span class="endpoint">/health</span></h3>
