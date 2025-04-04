@@ -2137,6 +2137,159 @@ app.post('/enhanced-thumbnail', upload.single('image'), async (req, res) => {
   }
 });
 
+// HashtagGenerator
+app.post('/hashtaggenerator', upload.single('subtitles'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        error: 'No subtitle file provided',
+        suggestion: 'Please upload an SRT or VTT file containing the video transcript'
+      });
+    }
+
+    // Parse parameters with defaults
+    const platforms = (req.body.platforms || 'youtube,tiktok,instagram')
+      .split(',')
+      .map(p => p.trim().toLowerCase());
+    
+    const hashtagCount = Math.min(
+      Math.max(parseInt(req.body.hashtagCount) || 15, 5), 
+      30
+    );
+
+    // Extract text from subtitles file
+    const subtitleContent = req.file.buffer.toString();
+    const transcript = extractTextFromSubtitles(subtitleContent);
+
+    // Generate hashtags using AI
+    const { hashtags, analysis } = await generateTrendingHashtags(
+      transcript, 
+      platforms, 
+      hashtagCount
+    );
+
+    const videoId = uuidv4();
+    
+    res.json({
+      videoId,
+      hashtags,
+      analysis,
+      message: 'Hashtags generated successfully'
+    });
+
+  } catch (error) {
+    console.error('Hashtag generation error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      suggestion: 'Try with a shorter transcript or different platforms'
+    });
+  }
+});
+
+// Helper function to extract plain text from subtitles
+function extractTextFromSubtitles(subtitleContent) {
+  // Remove SRT/VTT formatting (sequence numbers, timestamps, etc.)
+  return subtitleContent
+    .replace(/^\d+\s*$/gm, '')         // Remove sequence numbers
+    .replace(/^\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}\s*$/gm, '') // Remove timestamps
+    .replace(/<[^>]+>/g, '')           // Remove HTML tags if present
+    .replace(/^\s*WEBVTT\s*$/gm, '')   // Remove VTT header
+    .replace(/{[^}]+}/g, '')           // Remove styling cues
+    .replace(/^\s*$\n/gm, '')          // Remove empty lines
+    .trim();
+}
+
+// AI-powered hashtag generation
+async function generateTrendingHashtags(transcript, platforms, count) {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+  const platformDetails = {
+    youtube: "YouTube (focus on searchable, content-specific hashtags)",
+    tiktok: "TikTok (focus on viral challenges, trends, and music)",
+    instagram: "Instagram (focus on visual content, aesthetics, and communities)",
+    twitter: "Twitter (focus on current events, discussions, and brevity)",
+    facebook: "Facebook (focus on communities, groups, and longer-form content)"
+  };
+
+  const validPlatforms = platforms.filter(p => platformDetails[p]);
+  if (validPlatforms.length === 0) {
+    throw new Error('No valid platforms specified');
+  }
+
+  const prompt = `
+  Analyze this video transcript and generate ${count} highly relevant, trending hashtags 
+  for each of these platforms: ${validPlatforms.join(', ')}. Follow these rules:
+
+  1. Hashtags should be specific to the video content
+  2. Include a mix of:
+     - Content-specific tags (#CookingTips)
+     - Trending tags (#Viral2025)
+     - Platform-specific trends (#ForYouPage)
+     - General popularity tags (#Explore)
+  3. Avoid generic or overused hashtags unless highly relevant
+  4. Prioritize hashtags with good search volume but medium competition
+  5. Format response as valid JSON without markdown
+
+  For each platform, provide:
+  - 25% broad appeal hashtags
+  - 50% niche-specific hashtags
+  - 25% trending/seasonal hashtags
+
+  Platform details:
+  ${validPlatforms.map(p => `- ${p}: ${platformDetails[p]}`).join('\n')}
+
+  Return ONLY this JSON structure:
+  {
+    "hashtags": {
+      "[platform]": ["hashtag1", "hashtag2"],
+      ...
+    },
+    "analysis": "Brief analysis of content and hashtag strategy"
+  }
+
+  Video Transcript:
+  ${transcript.substring(0, 10000)} // Limit to first 10k chars
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const responseText = await result.response.text();
+    
+    
+    const cleanedResponse = responseText
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
+      .trim();
+    
+    const responseData = JSON.parse(cleanedResponse);
+    
+    
+    const formattedResponse = {
+      hashtags: {},
+      analysis: responseData.analysis || "AI-generated hashtag recommendations"
+    };
+
+
+    validPlatforms.forEach(platform => {
+      if (responseData.hashtags && responseData.hashtags[platform]) {
+        formattedResponse.hashtags[platform] = 
+          responseData.hashtags[platform]
+            .slice(0, count)
+            .map(tag => tag.startsWith('#') ? tag : `#${tag}`);
+      } else {
+        formattedResponse.hashtags[platform] = [];
+      }
+    });
+
+    return formattedResponse;
+
+  } catch (error) {
+    console.error('AI hashtag generation error:', error);
+    throw new Error('Failed to generate hashtags. Please try again later.');
+  }
+}
+
+
 // =============================================
 // Middleware for admin to shutdown whole system
 // =============================================
