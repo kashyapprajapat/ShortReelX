@@ -122,9 +122,12 @@ Applies enhancement filters (brightness, contrast, sharpening)
 
 
 ---
-### Get Enhanced Thumbnails
+### Get Enhanced Thumbnails api 
 ![Alt Text](./EnhancedThumbanisl.png)
 
+---
+### Hashtag Generator api 
+![Alt Text](./hashtaggeneartorapi.png)
 ---
 
 ## Forking the Project
