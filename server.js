@@ -1210,6 +1210,33 @@ app.get('/', (req, res) => {
   </pre>
 </div>
 
+<div class="route">
+          <h3><span class="method">POST</span> <span class="endpoint">/hashtaggenerator</span></h3>
+          <p><strong>Description:</strong> Generate trending hashtags based on video subtitles.</p>
+          <p><strong>Headers:</strong> <code>Content-Type: multipart/form-data</code></p>
+          <p><strong>Request Body:</strong></p>
+          <ul>
+            <li><code>subtitles</code> (file) - The subtitle file (SRT or VTT).</li>
+            <li><code>platforms</code> (string, optional) - Comma-separated list of platforms (default: "youtube,tiktok,instagram").</li>
+            <li><code>hashtagCount</code> (number, optional) - Number of hashtags to generate (default: 15, min: 5, max: 30).</li>
+          </ul>
+          <p><strong>Response:</strong></p>
+          <pre>
+{
+  "videoId": "UUID",
+  "hashtags": ["#trending", "#viral", "#shorts"],
+  "analysis": "AI insights on hashtag relevance",
+  "message": "Hashtags generated successfully"
+}
+          </pre>
+          <p><strong>Error Response:</strong></p>
+          <pre>
+{
+  "error": "No subtitle file provided",
+  "suggestion": "Please upload an SRT or VTT file containing the video transcript"
+}
+          </pre>
+        </div>
 
         <div class="route">
           <h3><span class="method">GET</span> <span class="endpoint">/health</span></h3>
