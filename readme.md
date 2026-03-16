@@ -7,6 +7,7 @@ ShortReelX is an AI-powered tool that transforms long videos into engaging YouTu
 - Extract transcripts using AI
 - Generate short clips from key moments
 - Ideal for content repurposing
+- [PopcornAI](https://popcornai.art/) - AI video and image generator for branded short clips, launch visuals, and campaign-ready creative assets.
 
 ---
 # ShortReelX 
